@@ -1,71 +1,64 @@
-# MarkLive Presentations
+/* MarkLive Presentations — Service Worker
+   Caches the entire app shell for full offline use.
+   No external dependencies — pure HTML/JS. */
 
-A fully offline, zero-dependency markdown editor built for live presentations. Write in markdown and see a clean formatted board in real time — no internet required.
+var CACHE_NAME = 'marklive-v1';
+var APP_SHELL = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
+];
 
-## ✨ Features
+/* Install: cache all app shell files */
+self.addEventListener('install', function(event) {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(function(cache) {
+      return cache.addAll(APP_SHELL);
+    }).then(function() {
+      return self.skipWaiting();
+    })
+  );
+});
 
-- **Live markdown rendering** — type and see formatted output instantly
-- **Multi-page support** — create unlimited pages per presentation
-- **Page-aware export/import** — save all pages in one `.md` file and reimport them with pages intact
-- **Fully offline** — installable as a PWA, works with no internet connection
-- **Mobile friendly** — responsive toolbar and sticky navigation for phones and tablets
-- **No dependencies** — pure HTML + JavaScript, zero external libraries or frameworks
-- **Formatting menu** — press `\` or `Ctrl+\` for a searchable format picker
-- **Batch edit mode** — select and reformat multiple lines at once
+/* Activate: remove old caches */
+self.addEventListener('activate', function(event) {
+  event.waitUntil(
+    caches.keys().then(function(keys) {
+      return Promise.all(
+        keys.filter(function(key) { return key !== CACHE_NAME; })
+            .map(function(key) { return caches.delete(key); })
+      );
+    }).then(function() {
+      return self.clients.claim();
+    })
+  );
+});
 
-## 🚀 Quick Start
+/* Fetch: cache-first strategy (offline first) */
+self.addEventListener('fetch', function(event) {
+  /* Only handle GET requests to our own origin */
+  if (event.request.method !== 'GET') return;
 
-Open [the live app](https://YOUR-USERNAME.github.io/marklive-presentations/) or download and open `index.html` directly in any modern browser.
+  event.respondWith(
+    caches.match(event.request).then(function(cached) {
+      if (cached) return cached;
 
-## ⌨️ Keyboard Shortcuts
-
-| Action | Shortcut |
-| --- | --- |
-| Formatting menu | `\` or `Ctrl+\` |
-| Bold | `Ctrl+B` |
-| Italic | `Ctrl+I` |
-| Underline | `Ctrl+U` |
-| Strikethrough | `Ctrl+Shift+X` |
-| Link | `Ctrl+K` |
-| Exit inline format | `]` |
-| Undo | `Ctrl+Z` |
-| Redo | `Ctrl+Y` |
-| Save current page | `Ctrl+S` |
-| Previous page | `Ctrl+←` |
-| Next page | `Ctrl+→` |
-
-## 📄 Page-Aware Save & Import
-
-- **Save .md** — saves the current page only
-- **Save All** — saves all pages in one `.md` file with embedded page markers
-- **Import** — automatically detects multi-page exports and restores each page
-
-## 📱 Install as PWA (Android / iOS)
-
-On Android (Chrome): tap the browser menu → *Add to Home Screen*  
-On iOS (Safari): tap Share → *Add to Home Screen*
-
-Once installed, the app works completely offline.
-
-## 🗂 Project Structure
-
-```
-marklive-presentations/
-├── index.html      ← entire app (HTML + CSS + JS, no build step)
-├── manifest.json   ← PWA manifest
-├── sw.js           ← service worker for offline caching
-└── icons/
-    ├── icon-192.png
-    └── icon-512.png
-```
-
-## 🌐 Deploy to GitHub Pages
-
-1. Push this folder to a GitHub repository
-2. Go to **Settings → Pages**
-3. Set source to `main` branch, root `/`
-4. Your app will be live at `https://YOUR-USERNAME.github.io/REPO-NAME/`
-
-## License
-
-MIT — free to use, fork, and modify.
+      /* Not in cache — try network, then cache the response */
+      return fetch(event.request).then(function(response) {
+        if (!response || response.status !== 200 || response.type === 'opaque') {
+          return response;
+        }
+        var toCache = response.clone();
+        caches.open(CACHE_NAME).then(function(cache) {
+          cache.put(event.request, toCache);
+        });
+        return response;
+      }).catch(function() {
+        /* Offline and not cached — return index.html as fallback */
+        return caches.match('/index.html');
+      });
+    })
+  );
+});
