@@ -1,17 +1,12 @@
-/* MarkLive Presentations — Service Worker
-   Caches the entire app shell for full offline use.
-   No external dependencies — pure HTML/JS. */
-
-var CACHE_NAME = 'marklive-v1';
+var CACHE_NAME = 'marklive-v2';
 var APP_SHELL = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  'index.html',
+  'manifest.json',
+  'sw.js',
+  'icon-192.png',
+  'icon-512.png'
 ];
 
-/* Install: cache all app shell files */
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
@@ -22,7 +17,6 @@ self.addEventListener('install', function(event) {
   );
 });
 
-/* Activate: remove old caches */
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
@@ -36,28 +30,18 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-/* Fetch: cache-first strategy (offline first) */
 self.addEventListener('fetch', function(event) {
-  /* Only handle GET requests to our own origin */
   if (event.request.method !== 'GET') return;
-
   event.respondWith(
     caches.match(event.request).then(function(cached) {
       if (cached) return cached;
-
-      /* Not in cache — try network, then cache the response */
       return fetch(event.request).then(function(response) {
-        if (!response || response.status !== 200 || response.type === 'opaque') {
-          return response;
-        }
+        if (!response || response.status !== 200 || response.type === 'opaque') return response;
         var toCache = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(event.request, toCache);
-        });
+        caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, toCache); });
         return response;
       }).catch(function() {
-        /* Offline and not cached — return index.html as fallback */
-        return caches.match('/index.html');
+        return caches.match('index.html');
       });
     })
   );
