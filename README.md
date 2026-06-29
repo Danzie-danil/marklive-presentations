@@ -69,14 +69,6 @@ marklive-presentations/
     ├── icon-192.png
     └── icon-512.png
 ```
-
-## 🌐 Deploy to GitHub Pages
-
-1. Push this folder to a GitHub repository
-2. Go to **Settings → Pages**
-3. Set source to `main` branch, root `/`
-4. Your app will be live at `https://YOUR-USERNAME.github.io/REPO-NAME/`
-
 ## License
 
 MIT — free to use, fork, and modify.
