@@ -2168,7 +2168,26 @@
   var saveDropdownEl = document.getElementById('saveDropdown');
   var saveMenuJustOpened = false;
 
-  function closeSaveMenu(){ saveMenu.hidden = true; }
+  /* iOS Safari quirk: an ancestor with -webkit-overflow-scrolling:touch
+     (here, .toolbar-actions on mobile) creates its own compositing layer
+     and traps position:fixed descendants inside it instead of letting
+     them escape to the viewport. Desktop/Android aren't affected, but on
+     iOS the "fixed" menu stays clipped/stuck behind the toolbar scroller.
+     Fix: portal the menu to <body> while open, then return it to its
+     original spot in the DOM when closed. */
+  var saveMenuHome = saveMenu.parentNode;
+  var saveMenuNextSibling = saveMenu.nextSibling;
+
+  function closeSaveMenu(){
+    saveMenu.hidden = true;
+    if (saveMenu.parentNode === document.body){
+      if (saveMenuNextSibling && saveMenuNextSibling.parentNode === saveMenuHome){
+        saveMenuHome.insertBefore(saveMenu, saveMenuNextSibling);
+      } else {
+        saveMenuHome.appendChild(saveMenu);
+      }
+    }
+  }
 
   /* Computes a viewport-relative position for the (now fixed) save menu,
      anchored under the Save button and clamped so it never runs off
@@ -2189,11 +2208,12 @@
     e.stopPropagation();
     var wasHidden = saveMenu.hidden;
     if (wasHidden){
+      document.body.appendChild(saveMenu);
       saveMenu.hidden = false;
       positionSaveMenu();
       saveMenuJustOpened = true;
     } else {
-      saveMenu.hidden = true;
+      closeSaveMenu();
     }
   });
 
@@ -2202,14 +2222,19 @@
     if (!saveMenu.hidden) positionSaveMenu();
   });
 
-  /* Close when clicking anywhere outside the dropdown */
+  /* Close when clicking anywhere outside the dropdown.
+     (saveMenu may be portaled to <body> while open, so it's checked
+     separately — it's no longer a descendant of saveDropdownEl then.) */
+  function isOutsideSaveMenu(target){
+    return !saveDropdownEl.contains(target) && !saveMenu.contains(target);
+  }
   document.addEventListener('click', function(e){
     if (saveMenuJustOpened){ saveMenuJustOpened = false; return; }
-    if (!saveDropdownEl.contains(e.target)) closeSaveMenu();
+    if (isOutsideSaveMenu(e.target)) closeSaveMenu();
   });
   document.addEventListener('touchend', function(e){
     if (saveMenuJustOpened){ saveMenuJustOpened = false; return; }
-    if (!saveDropdownEl.contains(e.target)) closeSaveMenu();
+    if (isOutsideSaveMenu(e.target)) closeSaveMenu();
   }, {passive:true});
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSaveMenu(); });
 
