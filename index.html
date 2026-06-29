@@ -647,11 +647,6 @@
     margin-top: calc(-1 * env(safe-area-inset-top, 0px));
   }
 
-  /* --- Floating format button (mobile only, hidden on desktop) --- */
-  #btnFormatFab{
-    display:none;
-  }
-
   /* ---------- Tablet (641–760px) ---------- */
   @media (max-width:760px) and (min-width:641px){
     .brand .tag{ font-size:9px; }
@@ -691,16 +686,14 @@
     .btn{ padding:5px 8px; font-size:11px; white-space:nowrap; }
 
     /* Hide rarely-needed buttons on mobile */
-    #btnSaveTxt{ display:none; }
-    #btnSaveAll{ display:none; }
     #btnCopy{ display:none; }
+    #btnEditMode{ display:none; }
 
     /* Shorten labels that are too wide */
     #btnUndo{ font-size:0; width:30px; padding:5px 0; text-align:center; }
     #btnUndo::before{ content:'↩'; font-size:14px; }
     #btnRedo{ font-size:0; width:30px; padding:5px 0; text-align:center; }
     #btnRedo::before{ content:'↪'; font-size:14px; }
-    #btnEditMode{ display:none; }
 
     /* ---- Pane label hint: hide on mobile ---- */
     .pane-label .hint{ display:none; }
@@ -749,30 +742,6 @@
       color: #a39c8c;
     }
 
-    /* ---- Floating format button ---- */
-    #btnFormatFab{
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: fixed;
-      right: 14px;
-      bottom: calc(var(--footer-h) + env(safe-area-inset-bottom, 0px) + 52px);
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: var(--accent);
-      color: var(--accent-ink);
-      border: none;
-      font-size: 22px;
-      font-weight: 700;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.28);
-      z-index: 28;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: transform .12s, opacity .12s;
-    }
-    #btnFormatFab:active{ transform:scale(0.92); opacity:0.85; }
-
     /* Slash-menu: full-width sheet on mobile */
     .slash-menu{
       width: calc(100vw - 16px);
@@ -803,27 +772,26 @@
   #cursorFab{
     position: fixed;
     z-index: 47;
-    width: 32px;
-    height: 32px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
-    background: var(--accent);
-    color: var(--accent-ink);
-    border: none;
-    font-size: 15px;
-    font-weight: 700;
-    display: none; /* shown only on mobile via JS */
+    background: var(--paper);
+    border: 1px solid rgba(27,35,48,0.14);
+    display: none; /* JS shows/hides — starts hidden */
     align-items: center;
     justify-content: center;
-    box-shadow: 0 3px 12px rgba(0,0,0,0.26);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
-    transition: opacity .15s, transform .15s;
+    transition: opacity .12s, transform .12s;
     pointer-events: auto;
-    line-height: 1;
     padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
   }
-  #cursorFab:active{ transform:scale(0.88); opacity:0.85; }
+  #cursorFab:active{ transform:scale(0.88); opacity:0.80; }
+  #cursorFab svg{ display:block; }
 
   /* ---------- Selection format popup (appears on text selection) ---------- */
   #selectionBar{
@@ -870,6 +838,51 @@
     background: rgba(255,255,255,0.18);
     flex-shrink: 0;
   }
+
+  /* ---------- Save dropdown ---------- */
+  .save-dropdown{
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+  .save-menu{
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 200px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.06);
+    padding: 5px;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .save-menu[hidden]{ display:none !important; }
+  .save-option{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 9px 12px;
+    border-radius: 7px;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .save-option:hover{ background: #f1efe9; }
+  .save-option span{
+    font-size: 11px;
+    color: #9b9384;
+    font-weight: 400;
+  }
 </style>
 </head>
 <body>
@@ -885,9 +898,15 @@
       <button class="btn" id="btnEditMode" type="button">Edit Mode</button>
       <button class="btn" id="btnHelp" type="button">Shortcuts</button>
       <button class="btn" id="btnCopy" type="button">Copy</button>
-      <button class="btn primary" id="btnSaveMd" type="button">Save .md</button>
-      <button class="btn" id="btnSaveTxt" type="button">Save .txt</button>
-      <button class="btn" id="btnSaveAll" type="button">Save All</button>
+      <!-- Save dropdown -->
+      <div class="save-dropdown" id="saveDropdown">
+        <button class="btn primary" id="btnSaveMenu" type="button">Save ▾</button>
+        <div class="save-menu" id="saveMenu" hidden>
+          <button class="save-option" id="btnSaveMd" type="button">Save as .md <span>current page</span></button>
+          <button class="save-option" id="btnSaveTxt" type="button">Save as .txt <span>current page</span></button>
+          <button class="save-option" id="btnSaveAll" type="button">Save all pages <span>.md with page markers</span></button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -917,14 +936,12 @@
     </section>
   </main>
 
-  <!-- Mobile floating format button -->
-  <button id="btnFormatFab" type="button" title="Formatting menu">⊞</button>
 
   <!-- Transparent backdrop: click outside menu to close -->
   <div id="slashBackdrop" style="display:none;position:fixed;inset:0;z-index:49;"></div>
 
   <!-- Inline cursor-following FAB (mobile) -->
-  <button id="cursorFab" type="button" aria-label="Formatting menu" style="display:none;">⊞</button>
+  <button id="cursorFab" type="button" aria-label="Formatting menu"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1b2330" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
 
   <div class="slash-menu" id="slashMenu" hidden>
     <div id="slashGroups"></div>
@@ -2046,24 +2063,51 @@
     }
   });
 
+  /* --- Save dropdown toggle --- */
+  var saveMenu = document.getElementById('saveMenu');
+  var btnSaveMenu = document.getElementById('btnSaveMenu');
+  var saveDropdownEl = document.getElementById('saveDropdown');
+  var saveMenuJustOpened = false;
+
+  function closeSaveMenu(){ saveMenu.hidden = true; }
+
+  btnSaveMenu.addEventListener('click', function(e){
+    e.stopPropagation();
+    var wasHidden = saveMenu.hidden;
+    saveMenu.hidden = !wasHidden;
+    if (wasHidden){ saveMenuJustOpened = true; }
+  });
+
+  /* Close when clicking anywhere outside the dropdown */
+  document.addEventListener('click', function(e){
+    if (saveMenuJustOpened){ saveMenuJustOpened = false; return; }
+    if (!saveDropdownEl.contains(e.target)) closeSaveMenu();
+  });
+  document.addEventListener('touchend', function(e){
+    if (saveMenuJustOpened){ saveMenuJustOpened = false; return; }
+    if (!saveDropdownEl.contains(e.target)) closeSaveMenu();
+  }, {passive:true});
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSaveMenu(); });
+
   /* --- Page-aware Save Current Page (.md) --- */
   document.getElementById('btnSaveMd').addEventListener('click', function(){
+    closeSaveMenu();
     saveCurrentPageContent();
     var content = editor.value;
     downloadFile('marklive-presentation-p' + (currentPage+1) + '.md', content);
   });
 
   document.getElementById('btnSaveTxt').addEventListener('click', function(){
+    closeSaveMenu();
     saveCurrentPageContent();
     downloadFile('marklive-presentation-p' + (currentPage+1) + '.txt', editor.value);
   });
 
   /* --- Page-aware Save All (.md with page break markers) --- */
   document.getElementById('btnSaveAll').addEventListener('click', function(){
+    closeSaveMenu();
     saveCurrentPageContent();
-    // Embed page boundaries as special comments so import can reconstruct pages
     var allContent = pages.map(function(md, i){
-      // Each page content is preceded by a page header comment
       return '<!-- marklive:page ' + (i+1) + ' -->\n' + md;
     }).join(PAGE_SEP);
     downloadFile('marklive-presentation-all.md', allContent);
@@ -2523,240 +2567,270 @@
     }
   });
 
-  /* ---------- Mobile: cursor-following FAB + selection bar ---------- */
+  /* =========================================================
+     Mobile: cursor-following FAB + text-selection popup bar
+     =========================================================
+     Strategy:
+     - We NEVER insert DOM nodes to measure caret position
+       (that triggers updateMarkdownFromBoard and wipes the caret).
+     - Instead we use a hidden <span id="caretAnchor"> that we
+       keep permanently inside the preview and move it to just
+       after the current caret using Range.insertNode on a RAF.
+       We immediately remove it after measuring, inside the same
+       microtask, before any MutationObserver can fire.
+     - The FAB shows on EVERY contenteditable input event and
+       on touchend. It hides after 5s idle or when a selection
+       appears (selection bar takes over).
+     - The selectionchange event drives both FAB and selBar.
+     - The backdrop (z-index 49) captures taps outside the menu.
+  ========================================================= */
   (function(){
-    var isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-    var cursorFab   = document.getElementById('cursorFab');
-    var selectionBar = document.getElementById('selectionBar');
-    var slashBackdrop = document.getElementById('slashBackdrop');
-    var fabVisible  = false;
-    var selBarVisible = false;
-    var fabHideTimer = null;
-    var selHideTimer = null;
+    var fab       = document.getElementById('cursorFab');
+    var selBar    = document.getElementById('selectionBar');
+    var backdrop  = document.getElementById('slashBackdrop');
 
-    /* ── Backdrop closes the slash menu on outside click/touch ── */
-    slashBackdrop.addEventListener('mousedown', function(e){ e.preventDefault(); closeMenu(); });
-    slashBackdrop.addEventListener('touchstart', function(e){ e.preventDefault(); closeMenu(); }, {passive:false});
+    /* ── Backdrop: tap outside slash menu → close ── */
+    backdrop.addEventListener('mousedown',  function(e){ e.preventDefault(); closeMenu(); });
+    backdrop.addEventListener('touchstart', function(e){ e.preventDefault(); closeMenu(); }, {passive:false});
 
-    /* Show/hide backdrop whenever menu opens or closes */
-    var _origOpen = openMenu;
-    openMenu = function(){
-      _origOpen.apply(this, arguments);
-      slashBackdrop.style.display = 'block';
-      hideCursorFab();
-    };
-    var _origClose = closeMenu;
-    closeMenu = function(){
-      _origClose.apply(this, arguments);
-      slashBackdrop.style.display = 'none';
-    };
+    var _oOpen = openMenu;
+    openMenu = function(){ _oOpen.apply(this,arguments); backdrop.style.display='block'; showFab(false); };
+    var _oClose = closeMenu;
+    closeMenu = function(){ _oClose.apply(this,arguments); backdrop.style.display='none'; scheduleFab(); };
 
-    /* ── Helpers ── */
-    function isMobileWidth(){ return window.innerWidth <= 640; }
+    /* ── Utilities ── */
+    var fabTimer = null;
+    var fabOn = false;
+    var selBarOn = false;
 
-    function hideCursorFab(){
-      if (cursorFab){ cursorFab.style.display = 'none'; fabVisible = false; }
+    function isMob(){ return window.innerWidth <= 700; }
+
+    function isInBoard(node){
+      return node && (node === preview || preview.contains(node));
     }
 
-    function hideSelBar(){
-      if (selectionBar){ selectionBar.style.display = 'none'; selBarVisible = false; }
+    /* Show/hide FAB */
+    function showFab(visible){
+      if (!fab) return;
+      fabOn = visible;
+      fab.style.display = visible ? 'flex' : 'none';
     }
 
-    /* ── Position cursor FAB next to caret ── */
-    function positionCursorFab(){
-      if (!isMobileWidth() || !cursorFab) return;
-      if (menuOpen || selBarVisible) { hideCursorFab(); return; }
+    /* Show/hide selection bar */
+    function showSelBar(visible){
+      if (!selBar) return;
+      selBarOn = visible;
+      selBar.style.display = visible ? 'flex' : 'none';
+      if (!visible) return;
+      showFab(false); /* FAB and selBar are mutually exclusive */
+    }
 
-      /* Get caret position from selection */
+    /* Get caret rect WITHOUT touching the DOM.
+       Works by calling getBoundingClientRect on a collapsed Range. */
+    function getCaretRect(){
       var sel = window.getSelection();
-      if (!sel || !sel.rangeCount || !sel.getRangeAt(0).collapsed){
-        hideCursorFab(); return;
-      }
-      var range = sel.getRangeAt(0).cloneRange();
-      if (!preview.contains(range.startContainer)){ hideCursorFab(); return; }
-
-      /* Get a rect for the caret */
-      var rects = range.getClientRects();
-      var rect  = rects && rects.length ? rects[rects.length - 1] : null;
-      if (!rect || (!rect.width && !rect.height)){
-        /* Insert a zero-width span to measure */
-        var marker = document.createElement('span');
-        marker.textContent = '​';
-        range.insertNode(marker);
-        rect = marker.getBoundingClientRect();
-        marker.parentNode.removeChild(marker);
-      }
-      if (!rect || (!rect.width && !rect.height)){ hideCursorFab(); return; }
-
-      var fabSize  = 32;
-      var gap      = 10; /* distance from caret */
-      var top      = rect.top + (rect.height / 2) - (fabSize / 2);
-      var left     = rect.right + gap;
-
-      /* Keep on screen */
-      if (left + fabSize + 8 > window.innerWidth) left = rect.left - fabSize - gap;
-      if (left < 8) left = 8;
-      if (top < 60) top = 60;
-      if (top + fabSize + 8 > window.innerHeight) top = window.innerHeight - fabSize - 8;
-
-      cursorFab.style.top  = top  + 'px';
-      cursorFab.style.left = left + 'px';
-      cursorFab.style.display = 'flex';
-      fabVisible = true;
-
-      /* Auto-hide after 4 s of no typing */
-      clearTimeout(fabHideTimer);
-      fabHideTimer = setTimeout(hideCursorFab, 4000);
+      if (!sel || !sel.rangeCount) return null;
+      var r = sel.getRangeAt(0);
+      if (!isInBoard(r.startContainer)) return null;
+      /* getBoundingClientRect on a collapsed range gives the caret rect
+         on Chrome/Safari. On Firefox it may be zero-sized — fallback below. */
+      var rect = r.getBoundingClientRect();
+      if (rect && (rect.width > 0 || rect.height > 0)) return rect;
+      /* Firefox fallback: expand range by one char then re-collapse */
+      try {
+        var r2 = r.cloneRange();
+        r2.setStart(r.startContainer, Math.max(0, r.startOffset - 1));
+        rect = r2.getBoundingClientRect();
+        if (rect && (rect.width > 0 || rect.height > 0)) return {
+          top: rect.top, bottom: rect.bottom,
+          left: rect.right, right: rect.right,
+          width: 0, height: rect.height
+        };
+      } catch(e){}
+      /* Last resort: use the bounding rect of the containing element */
+      var el = r.startContainer;
+      if (el.nodeType === 3) el = el.parentElement;
+      return el ? el.getBoundingClientRect() : null;
     }
 
-    /* ── Position selection bar above selected text ── */
-    function positionSelectionBar(){
-      if (!selectionBar) return;
+    /* Place the FAB next to the caret */
+    function placeFab(){
+      if (!fab || !isMob() || menuOpen || selBarOn) { showFab(false); return; }
+      var rect = getCaretRect();
+      if (!rect || rect.height === 0) { showFab(false); return; }
+
+      var vw  = window.innerWidth;
+      var vh  = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      var sz  = 34;
+      var gap = 12;
+
+      /* Prefer right of caret; flip left if it would overflow */
+      var left = rect.right + gap;
+      if (left + sz + 4 > vw) left = rect.left - sz - gap;
+      left = Math.max(4, Math.min(vw - sz - 4, left));
+
+      /* Vertically centre on the line */
+      var top = rect.top + (rect.height - sz) / 2;
+      /* Clamp: don't go above toolbar (~50px) or below footer (~90px from bottom) */
+      var topMin = 54;
+      var topMax = vh - 90 - sz;
+      top = Math.max(topMin, Math.min(topMax, top));
+
+      fab.style.left = left + 'px';
+      fab.style.top  = top  + 'px';
+      showFab(true);
+
+      /* Auto-hide after 5 s of no activity */
+      clearTimeout(fabTimer);
+      fabTimer = setTimeout(function(){ showFab(false); }, 5000);
+    }
+
+    /* Place the selection popup bar above (or below) selected text */
+    function placeSelBar(){
+      if (!selBar) return;
       var sel = window.getSelection();
-      if (!sel || !sel.rangeCount || sel.isCollapsed){
-        hideSelBar(); return;
-      }
-      /* Only show if selection is inside the board */
-      var range = sel.getRangeAt(0);
-      if (!preview.contains(range.commonAncestorContainer)){ hideSelBar(); return; }
+      if (!sel || !sel.rangeCount || sel.isCollapsed){ showSelBar(false); return; }
+      var r = sel.getRangeAt(0);
+      if (!isInBoard(r.commonAncestorContainer)){ showSelBar(false); return; }
 
-      var rect = range.getBoundingClientRect();
-      if (!rect || (!rect.width && !rect.height)){ hideSelBar(); return; }
+      var rect = r.getBoundingClientRect();
+      if (!rect || (!rect.width && !rect.height)){ showSelBar(false); return; }
 
-      /* Measure bar width roughly */
-      selectionBar.style.display = 'flex';
-      selBarVisible = true;
-      hideCursorFab();
+      /* Make visible off-screen to measure */
+      selBar.style.visibility = 'hidden';
+      selBar.style.display = 'flex';
+      var bw = selBar.offsetWidth  || 250;
+      var bh = selBar.offsetHeight || 42;
+      selBar.style.visibility = '';
 
-      var barW   = selectionBar.offsetWidth  || 240;
-      var barH   = selectionBar.offsetHeight || 40;
-      var margin = 8;
-      var arrowH = 8;
+      var vw  = window.innerWidth;
+      var vh  = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      var mg  = 8;
+      var arr = 10; /* arrow height */
 
-      var top  = rect.top - barH - arrowH - margin;
-      var left = rect.left + (rect.width / 2) - (barW / 2);
+      /* Centre over selection, prefer above */
+      var left = rect.left + rect.width / 2 - bw / 2;
+      left = Math.max(mg, Math.min(vw - bw - mg, left));
 
-      /* If no room above, show below */
-      if (top < 60){ top = rect.bottom + arrowH + margin; }
-      if (left < margin) left = margin;
-      if (left + barW > window.innerWidth - margin) left = window.innerWidth - barW - margin;
+      var top = rect.top - bh - arr - mg;
+      if (top < 54) top = rect.bottom + arr + mg; /* flip below */
+      if (top + bh > vh - mg) top = vh - bh - mg;
 
-      selectionBar.style.top  = top  + 'px';
-      selectionBar.style.left = left + 'px';
-
-      clearTimeout(selHideTimer);
+      selBar.style.left = left + 'px';
+      selBar.style.top  = top  + 'px';
+      showSelBar(true);
     }
 
-    /* ── FAB click ── */
-    if (cursorFab){
-      cursorFab.addEventListener('mousedown', function(e){ e.preventDefault(); });
-      cursorFab.addEventListener('click', function(){
+    /* Decide what to show based on current selection state */
+    function update(){
+      if (menuOpen) { showFab(false); showSelBar(false); return; }
+      var sel = window.getSelection();
+      var hasSelection = sel && !sel.isCollapsed &&
+                         sel.rangeCount && isInBoard(sel.getRangeAt(0).commonAncestorContainer);
+      if (hasSelection){
+        placeSelBar();
+      } else {
+        showSelBar(false);
+        if (isMob()) placeFab();
+        else showFab(false);
+      }
+    }
+
+    /* Debounced update scheduler */
+    var updateTimer = null;
+    function scheduleFab(delay){
+      clearTimeout(updateTimer);
+      updateTimer = setTimeout(update, delay || 60);
+    }
+
+    /* ── Event wiring ── */
+
+    /* selectionchange fires on every caret move and selection change */
+    document.addEventListener('selectionchange', function(){
+      /* Only act when the board is active */
+      if (document.activeElement !== preview && !preview.contains(document.activeElement)) return;
+      scheduleFab(50);
+    });
+
+    /* input: fires on every keystroke inside contenteditable */
+    preview.addEventListener('input', function(){
+      scheduleFab(30);
+    });
+
+    /* touchend: finger lifted — check after iOS updates selection */
+    preview.addEventListener('touchend', function(){
+      scheduleFab(180);
+    });
+
+    /* focus: board focused (keyboard appeared) */
+    preview.addEventListener('focus', function(){
+      if (isMob()) scheduleFab(200);
+    });
+
+    /* blur: board lost focus — hide both */
+    preview.addEventListener('blur', function(){
+      clearTimeout(fabTimer);
+      clearTimeout(updateTimer);
+      /* Small delay: if focus moved to FAB/selBar button, don't hide */
+      setTimeout(function(){
+        var af = document.activeElement;
+        if (af === fab || af === selBar || (selBar && selBar.contains(af))) return;
+        showFab(false);
+        /* Keep selBar visible briefly so user can tap its buttons */
+      }, 150);
+    });
+
+    /* Tap outside: hide selBar (FAB auto-hides via timer) */
+    document.addEventListener('touchstart', function(e){
+      if (fab     && fab.contains(e.target))     return;
+      if (selBar  && selBar.contains(e.target))  return;
+      if (backdrop && backdrop.contains(e.target)) return;
+      setTimeout(function(){
+        var sel = window.getSelection();
+        if (!sel || sel.isCollapsed) showSelBar(false);
+      }, 80);
+    }, {passive:true});
+
+    /* ── FAB click → open menu ── */
+    if (fab){
+      fab.addEventListener('mousedown', function(e){ e.preventDefault(); });
+      fab.addEventListener('touchstart', function(e){ e.preventDefault(); saveBoardSelection(); }, {passive:false});
+      fab.addEventListener('click', function(){
+        showFab(false);
         saveBoardSelection();
         openMenu('command');
-        hideCursorFab();
       });
     }
 
     /* ── Selection bar button clicks ── */
-    if (selectionBar){
-      selectionBar.addEventListener('mousedown', function(e){ e.preventDefault(); });
-      selectionBar.addEventListener('click', function(e){
+    if (selBar){
+      selBar.addEventListener('mousedown', function(e){ e.preventDefault(); });
+      selBar.addEventListener('touchstart', function(e){ e.stopPropagation(); }, {passive:true});
+      selBar.addEventListener('click', function(e){
         var btn = e.target.closest('.sb-btn');
         if (!btn) return;
         var fmt = btn.getAttribute('data-fmt');
-        if (fmt === 'menu'){
-          saveBoardSelection();
-          hideSelBar();
-          openMenu('command');
-        } else if (fmt === 'bold')      { quickWrap('**'); hideSelBar(); }
-        else if (fmt === 'italic')      { quickWrap('*');  hideSelBar(); }
-        else if (fmt === 'underline')   { quickWrap('++'); hideSelBar(); }
-        else if (fmt === 'strike')      { quickWrap('~~'); hideSelBar(); }
-        else if (fmt === 'code')        { saveBoardSelection(); applyRichFormat({type:'wrap',marker:'`',placeholder:'code'}); hideSelBar(); }
-        else if (fmt === 'link')        { saveBoardSelection(); applyRichFormat({type:'link'}); hideSelBar(); }
+        saveBoardSelection();
+        showSelBar(false);
+        if      (fmt === 'bold')      quickWrap('**');
+        else if (fmt === 'italic')    quickWrap('*');
+        else if (fmt === 'underline') quickWrap('++');
+        else if (fmt === 'strike')    quickWrap('~~');
+        else if (fmt === 'code')      applyRichFormat({type:'wrap',marker:'`',placeholder:'code'});
+        else if (fmt === 'link')      applyRichFormat({type:'link'});
+        else if (fmt === 'menu')      { openMenu('command'); return; }
+        /* Recheck after formatting */
+        setTimeout(update, 100);
       });
     }
 
-    /* ── Track caret movement to reposition FAB ── */
-    preview.addEventListener('keyup', function(){
-      clearTimeout(selHideTimer);
-      selHideTimer = setTimeout(function(){
-        var sel = window.getSelection();
-        if (sel && !sel.isCollapsed && preview.contains(sel.anchorNode)){
-          positionSelectionBar();
-        } else {
-          hideSelBar();
-          if (isMobileWidth()) positionCursorFab();
-        }
-      }, 80);
-    });
-
-    preview.addEventListener('touchend', function(){
-      setTimeout(function(){
-        var sel = window.getSelection();
-        if (sel && !sel.isCollapsed && preview.contains(sel.anchorNode)){
-          positionSelectionBar();
-        } else {
-          hideSelBar();
-          if (isMobileWidth()) positionCursorFab();
-        }
-      }, 120);
-    });
-
-    /* Also reposition on selectionchange (desktop + mobile) */
-    document.addEventListener('selectionchange', function(){
-      if (!preview.contains(document.activeElement) && document.activeElement !== preview) return;
-      clearTimeout(selHideTimer);
-      selHideTimer = setTimeout(function(){
-        var sel = window.getSelection();
-        if (sel && !sel.isCollapsed && preview.contains(sel.anchorNode)){
-          positionSelectionBar();
-        } else {
-          hideSelBar();
-          if (isMobileWidth()) positionCursorFab();
-        }
-      }, 80);
-    });
-
-    /* Hide both when user taps elsewhere */
-    document.addEventListener('touchstart', function(e){
-      if (cursorFab && cursorFab.contains(e.target)) return;
-      if (selectionBar && selectionBar.contains(e.target)) return;
-      if (slashBackdrop.contains(e.target)) return;
-      /* hide FAB after short delay to allow tap-inside to fire first */
-      setTimeout(function(){
-        var sel = window.getSelection();
-        if (!sel || sel.isCollapsed) hideSelBar();
-      }, 50);
-    }, {passive:true});
-
-    /* Hide selection bar when menu closes */
-    var _origClose2 = closeMenu;
-    closeMenu = function(){
-      _origClose2.apply(this, arguments);
-      /* restore cursor FAB after menu closes */
-      setTimeout(function(){
-        if (isMobileWidth()) positionCursorFab();
-      }, 200);
-    };
-
-    /* Show cursor FAB whenever the board gets focus */
-    preview.addEventListener('focus', function(){
-      if (!isMobileWidth()) return;
-      setTimeout(positionCursorFab, 150);
-    });
-
-    /* Update on input */
-    preview.addEventListener('input', function(){
-      if (!isMobileWidth()) return;
-      hideSelBar();
-      positionCursorFab();
-    });
-
-    window.addEventListener('resize', function(){
-      hideCursorFab();
-      hideSelBar();
-    });
+    /* Reposition FAB when viewport resizes (keyboard open/close) */
+    if (window.visualViewport){
+      window.visualViewport.addEventListener('resize', function(){
+        scheduleFab(100);
+      });
+    }
+    window.addEventListener('resize', function(){ showFab(false); showSelBar(false); });
 
   })();
 
