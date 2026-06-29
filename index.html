@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="description" content="MarkLive Presentations — live markdown for slides and presentations, fully offline">
 <meta name="theme-color" content="#14161c">
 <meta name="mobile-web-app-capable" content="yes">
@@ -611,19 +611,40 @@
 
   /* ---------- Mobile: keyboard-safe sticky layout ---------- */
   /*
-   * The key trick: .app uses 100dvh (dynamic viewport height).
-   * On iOS/Android, dvh shrinks when the soft keyboard opens,
-   * so the flexbox re-distributes and toolbar + footer stay
-   * pinned while only .workspace (the middle) shrinks.
-   * We also add padding-bottom: env(safe-area-inset-bottom)
-   * so the footer clears the home-indicator bar on notched phones.
+   * Safe-area insets via env():
+   *   - top    → status bar / notch (iOS) or camera cutout (Android)
+   *   - bottom → home indicator bar on notchless iPhones & Android gesture nav
+   *
+   * We apply them directly to the toolbar (top) and page-nav footer (bottom)
+   * so the content is never hidden behind the OS chrome.
+   *
+   * The app container uses 100dvh — dynamic viewport height — which
+   * automatically shrinks when the soft keyboard opens, keeping the
+   * toolbar and footer pinned without any JS tricks on Android.
+   * For iOS we supplement with the visualViewport JS listener below.
    */
   .app{
     height: 100dvh;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+  /* Push toolbar content below the status bar / notch */
   .toolbar{
     padding-top: max(8px, env(safe-area-inset-top, 0px));
+    min-height: calc(var(--toolbar-h) + env(safe-area-inset-top, 0px));
+  }
+  /* Push footer content above the home indicator */
+  .page-nav{
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+  }
+  /* Fill the background colour into the safe-area zones so they look intentional */
+  body{
+    background: var(--bar);
+    /* iOS: extend bar colour into top safe area */
+    padding-top: env(safe-area-inset-top, 0px);
+    /* extend paper colour into bottom safe area is handled per-element */
+  }
+  /* Undo the body padding-top on the app so items aren't double-padded */
+  .app{
+    margin-top: calc(-1 * env(safe-area-inset-top, 0px));
   }
 
   /* --- Floating format button (mobile only, hidden on desktop) --- */
@@ -647,9 +668,9 @@
 
     /* ---- Toolbar: single compact row ---- */
     .toolbar{
-      padding: 6px 8px;
+      padding: max(6px, env(safe-area-inset-top, 0px)) 8px 6px 8px;
       gap: 4px;
-      min-height: var(--toolbar-h);
+      min-height: calc(var(--toolbar-h) + env(safe-area-inset-top, 0px));
       flex-wrap: nowrap;
       overflow: hidden;
     }
@@ -690,15 +711,15 @@
     .editor-pane{ flex:1 1 50%; }
     .preview-pane{ flex:1 1 50%; }
     .divider{ display:none; }
-    .live-canvas[data-empty="true"]::after{ font-size:14px; padding:6px 14px; }
-    .live-preview{ font-size:15px; padding:6px 14px 80px; }
-    #editor{ font-size:15px; padding:6px 14px 80px; }
+    .live-canvas[data-empty="true"]::after{ font-size:16px; padding:6px 14px; }
+    .live-preview{ font-size:16px; padding:6px 14px 80px; }
+    #editor{ font-size:16px; padding:6px 14px 80px; }
 
     /* ---- Footer page-nav: two rows on mobile ---- */
     .page-nav{
       flex-direction: column;
       gap: 4px;
-      padding: 5px 8px 6px;
+      padding: 5px 8px max(6px, env(safe-area-inset-bottom, 0px)) 8px;
       min-height: auto;
       align-items: stretch;
     }
