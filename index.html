@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="description" content="MarkLive Presentations — live markdown for slides and presentations, fully offline">
 <meta name="theme-color" content="#14161c">
 <meta name="mobile-web-app-capable" content="yes">
@@ -609,42 +609,173 @@
     margin-right:2px;
   }
 
-  /* ---------- Mobile responsive ---------- */
-  @media (max-width:640px){
-    :root{ --toolbar-h:48px; --footer-h:44px; }
-    .brand .tag{ display:none; }
-    .toolbar{ padding:6px 8px; gap:5px; }
-    .btn{ padding:5px 8px; font-size:11px; }
-    .toolbar-actions{ gap:4px; }
-    /* Hide less critical buttons on very small screens */
-    #btnSaveTxt{ display:none; }
-    #btnSaveAll{ display:none; }
-    .page-stats{ display:none; }
-    .pane-label .hint{ display:none; }
-    .workspace{ flex-direction:column; }
-    .editor-pane{ flex:1 1 50%; }
-    .preview-pane{ flex:1 1 50%; }
-    .divider{ display:none; }
-    .live-canvas[data-empty="true"]::after{ font-size:14px; }
-    .live-preview{ font-size:15px; }
-    #editor{ font-size:15px; }
-    .page-nav{ padding:5px 8px; gap:4px; }
-    .page-nav .btn{ font-size:11px; padding:4px 7px; }
-    #pageIndicator{ font-size:11px; min-width:60px; }
+  /* ---------- Mobile: keyboard-safe sticky layout ---------- */
+  /*
+   * The key trick: .app uses 100dvh (dynamic viewport height).
+   * On iOS/Android, dvh shrinks when the soft keyboard opens,
+   * so the flexbox re-distributes and toolbar + footer stay
+   * pinned while only .workspace (the middle) shrinks.
+   * We also add padding-bottom: env(safe-area-inset-bottom)
+   * so the footer clears the home-indicator bar on notched phones.
+   */
+  .app{
+    height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .toolbar{
+    padding-top: max(8px, env(safe-area-inset-top, 0px));
   }
 
-  @media (max-width:400px){
-    .brand{ font-size:13px; }
-    .btn{ padding:4px 7px; font-size:11px; }
-    #btnUndo span, #btnRedo span{ display:none; }
-    #btnCopy{ display:none; }
+  /* --- Floating format button (mobile only, hidden on desktop) --- */
+  #btnFormatFab{
+    display:none;
   }
 
+  /* ---------- Tablet (641–760px) ---------- */
   @media (max-width:760px) and (min-width:641px){
     .brand .tag{ font-size:9px; }
     .btn{ padding:5px 9px; font-size:12px; }
     .toolbar{ padding:7px 10px; }
-    .page-stats{ font-size:10.5px; }
+  }
+
+  /* ---------- Mobile (≤640px) ---------- */
+  @media (max-width:640px){
+    :root{
+      --toolbar-h: 44px;
+      --footer-h: 40px;
+    }
+
+    /* ---- Toolbar: single compact row ---- */
+    .toolbar{
+      padding: 6px 8px;
+      gap: 4px;
+      min-height: var(--toolbar-h);
+      flex-wrap: nowrap;
+      overflow: hidden;
+    }
+    .brand .tag{ display:none; }
+    .brand{ font-size:13px; gap:4px; flex-shrink:0; }
+
+    .toolbar-actions{
+      gap: 3px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      justify-content: flex-end;
+    }
+    .toolbar-actions::-webkit-scrollbar{ display:none; }
+
+    /* Slim all buttons */
+    .btn{ padding:5px 8px; font-size:11px; white-space:nowrap; }
+
+    /* Hide rarely-needed buttons on mobile */
+    #btnSaveTxt{ display:none; }
+    #btnSaveAll{ display:none; }
+    #btnCopy{ display:none; }
+
+    /* Shorten labels that are too wide */
+    #btnUndo{ font-size:0; width:30px; padding:5px 0; text-align:center; }
+    #btnUndo::before{ content:'↩'; font-size:14px; }
+    #btnRedo{ font-size:0; width:30px; padding:5px 0; text-align:center; }
+    #btnRedo::before{ content:'↪'; font-size:14px; }
+    #btnEditMode{ display:none; }
+
+    /* ---- Pane label hint: hide on mobile ---- */
+    .pane-label .hint{ display:none; }
+    .pane-label{ padding:5px 10px 4px; font-size:10px; }
+
+    /* ---- Content area ---- */
+    .workspace{ flex-direction:column; }
+    .editor-pane{ flex:1 1 50%; }
+    .preview-pane{ flex:1 1 50%; }
+    .divider{ display:none; }
+    .live-canvas[data-empty="true"]::after{ font-size:14px; padding:6px 14px; }
+    .live-preview{ font-size:15px; padding:6px 14px 80px; }
+    #editor{ font-size:15px; padding:6px 14px 80px; }
+
+    /* ---- Footer page-nav: two rows on mobile ---- */
+    .page-nav{
+      flex-direction: column;
+      gap: 4px;
+      padding: 5px 8px 6px;
+      min-height: auto;
+      align-items: stretch;
+    }
+    .page-nav-controls{
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      width: 100%;
+    }
+    .page-nav .btn{
+      font-size: 11px;
+      padding: 4px 9px;
+    }
+    #pageIndicator{
+      font-size: 11px;
+      min-width: 72px;
+      text-align: center;
+    }
+
+    /* Stats: show on second row, centred */
+    .page-stats{
+      display: flex !important;
+      justify-content: center;
+      gap: 8px;
+      font-size: 10.5px;
+      color: #a39c8c;
+    }
+
+    /* ---- Floating format button ---- */
+    #btnFormatFab{
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: fixed;
+      right: 14px;
+      bottom: calc(var(--footer-h) + env(safe-area-inset-bottom, 0px) + 52px);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--accent-ink);
+      border: none;
+      font-size: 22px;
+      font-weight: 700;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.28);
+      z-index: 28;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform .12s, opacity .12s;
+    }
+    #btnFormatFab:active{ transform:scale(0.92); opacity:0.85; }
+
+    /* Slash-menu: full-width sheet on mobile */
+    .slash-menu{
+      width: calc(100vw - 16px);
+      max-width: 360px;
+      max-height: 55vh;
+      bottom: calc(var(--footer-h) + env(safe-area-inset-bottom, 0px) + 8px);
+      top: auto !important;
+      left: 8px !important;
+      right: 8px;
+      border-radius: 14px 14px 14px 14px;
+    }
+
+    /* Toast above footer */
+    .toast{
+      bottom: calc(var(--footer-h) + env(safe-area-inset-bottom, 0px) + 56px);
+    }
+  }
+
+  /* ---------- Very small phones (≤380px) ---------- */
+  @media (max-width:380px){
+    .brand{ font-size:12px; }
+    #btnImport{ display:none; }
+    .page-nav .btn{ font-size:10.5px; padding:3px 7px; }
+    #pageIndicator{ font-size:10.5px; min-width:64px; }
   }
 </style>
 </head>
@@ -671,7 +802,7 @@
     <section class="pane live-pane">
       <div class="pane-label">
         <span>Live Board</span>
-        <span class="hint">Type <kbd>\</kbd> or <kbd>Ctrl</kbd>+<kbd>\</kbd> for formats · <kbd>]</kbd> to end formatting</span>
+        <span class="hint">Type <kbd>\</kbd> or <kbd>/</kbd> for formats · triple-tap · <kbd>]</kbd> to end</span>
       </div>
       <div class="live-canvas" id="liveCanvas" data-placeholder="Nothing here yet — start typing your presentation." data-empty="false">
         <div class="preview live-preview" id="preview" contenteditable="true" spellcheck="false" aria-label="Live presentation board"></div>
@@ -692,6 +823,9 @@
       </nav>
     </section>
   </main>
+
+  <!-- Mobile floating format button -->
+  <button id="btnFormatFab" type="button" title="Formatting menu (or type / · triple-tap)">⊞</button>
 
   <div class="slash-menu" id="slashMenu" hidden>
     <div id="slashGroups"></div>
@@ -739,6 +873,7 @@
       <div class="sub">All formatting works offline. Select text first to wrap it; with no selection a placeholder is inserted.</div>
       <table>
         <tr><td>Open formatting menu</td><td><kbd>\</kbd> or <kbd>Ctrl</kbd>+<kbd>\</kbd></td></tr>
+        <tr><td>Open formatting menu (mobile)</td><td>Type <kbd>/</kbd> · Triple-tap · ⊞ button</td></tr>
         <tr><td>Navigate menu</td><td>↑ ↓ Enter</td></tr>
         <tr><td>Filter menu while open</td><td>just keep typing</td></tr>
         <tr><td>Close menu</td><td>Esc</td></tr>
@@ -2240,6 +2375,27 @@
       openMenu('command');
       return;
     }
+    /* "/" also opens the menu — especially useful on mobile keyboards */
+    if ((ev.key === '/' || ev.code === 'Slash') && !mod && !ev.shiftKey && !ev.altKey){
+      var sel0b = window.getSelection();
+      var isAtLineStart = false;
+      if (sel0b && sel0b.rangeCount && sel0b.getRangeAt(0).collapsed){
+        var r0b = sel0b.getRangeAt(0);
+        var container0b = r0b.startContainer;
+        /* Check if at start of a line or block */
+        var textBefore = '';
+        if (container0b.nodeType === 3){
+          textBefore = container0b.textContent.slice(0, r0b.startOffset);
+        }
+        isAtLineStart = textBefore.trim() === '' || textBefore === '' ;
+      }
+      if (isAtLineStart){
+        ev.preventDefault();
+        saveBoardSelection();
+        openMenu('slash');
+        return;
+      }
+    }
     if (mod && !ev.shiftKey && ev.key.toLowerCase() === 'z'){ ev.preventDefault(); doUndo(); return; }
     if (mod && !ev.shiftKey && ev.key.toLowerCase() === 'y'){ ev.preventDefault(); doRedo(); return; }
     if (mod && !ev.shiftKey && ev.key.toLowerCase() === 'b'){ ev.preventDefault(); quickWrap('**'); return; }
@@ -2254,6 +2410,83 @@
       return;
     }
   });
+
+  /* ---------- Mobile: triple-tap to open format menu ---------- */
+  (function(){
+    var tapCount = 0;
+    var tapTimer = null;
+    var TAP_WINDOW = 500; /* ms — window for 3 taps */
+
+    function onTap(){
+      tapCount++;
+      clearTimeout(tapTimer);
+      if (tapCount >= 3){
+        tapCount = 0;
+        saveBoardSelection();
+        openMenu('command');
+        return;
+      }
+      tapTimer = setTimeout(function(){ tapCount = 0; }, TAP_WINDOW);
+    }
+
+    /* Listen on the live-preview board */
+    preview.addEventListener('touchend', function(ev){
+      /* Only count single-finger taps */
+      if (ev.changedTouches.length === 1 && !menuOpen){
+        onTap();
+      }
+    }, {passive:true});
+  })();
+
+  /* ---------- Mobile: FAB button wires to format menu ---------- */
+  var btnFormatFab = document.getElementById('btnFormatFab');
+  if (btnFormatFab){
+    btnFormatFab.addEventListener('click', function(){
+      saveBoardSelection();
+      openMenu('command');
+    });
+    /* Show FAB only when we are in the live board view and no modal is open */
+    function updateFabVisibility(){
+      if (window.innerWidth > 640){ btnFormatFab.style.display = 'none'; return; }
+      var anyModalOpen = !document.getElementById('helpBackdrop').hidden ||
+                         !document.getElementById('editModeBackdrop').hidden;
+      btnFormatFab.style.display = (anyModalOpen || menuOpen) ? 'none' : '';
+    }
+    window.addEventListener('resize', updateFabVisibility);
+    /* Re-check visibility whenever menus open/close */
+    var _origOpenMenu = openMenu;
+    openMenu = function(){
+      _origOpenMenu.apply(this, arguments);
+      updateFabVisibility();
+    };
+    var _origCloseMenu = closeMenu;
+    closeMenu = function(){
+      _origCloseMenu.apply(this, arguments);
+      updateFabVisibility();
+    };
+    document.getElementById('btnHelp').addEventListener('click', updateFabVisibility);
+    document.getElementById('btnCloseHelp').addEventListener('click', updateFabVisibility);
+    document.getElementById('btnEditMode').addEventListener('click', updateFabVisibility);
+    document.getElementById('btnEditDone').addEventListener('click', updateFabVisibility);
+    updateFabVisibility();
+  }
+
+  /* ---------- iOS Safari: keep toolbar/footer pinned when keyboard shows ---------- */
+  /*
+   * On iOS the visual viewport shrinks when the keyboard appears.
+   * We listen to visualViewport resize and nudge the app height so
+   * that flexbox keeps toolbar at top and footer at bottom.
+   */
+  if (window.visualViewport){
+    var appEl = document.querySelector('.app');
+    function onViewportResize(){
+      var vvh = window.visualViewport.height;
+      appEl.style.height = vvh + 'px';
+    }
+    window.visualViewport.addEventListener('resize', onViewportResize);
+    window.visualViewport.addEventListener('scroll', onViewportResize);
+    onViewportResize();
+  }
 
   /* ---------- Initial setup ---------- */
   editor.value = DEMO_TEXT;
