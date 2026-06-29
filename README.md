@@ -47,6 +47,17 @@ On iOS (Safari): tap Share → *Add to Home Screen*
 
 Once installed, the app works completely offline.
 
+## 🔄 Releasing an update
+
+Installed copies of the app update themselves — no need to uninstall/reinstall:
+
+1. Add a new entry to the **top** of the `CHANGELOG` array near the top of the main `<script>` in `index.html`, describing what changed/what was fixed. This also drives the in-app **"What's new"** dialog (tap the version badge next to the app name).
+2. Bump `SW_VERSION` in `sw.js` to the same version string.
+
+Step 2 matters: changing `sw.js`'s bytes is what makes browsers notice a new service worker exists and install it, which rotates the offline cache. Whenever the device is online, the app also always fetches the latest `index.html` from the server first (network-first), so most content changes show up immediately regardless — the version bump just makes the *offline* cache and the "what's new" prompt line up with it.
+
+When an update finishes installing in the background, a small "Update ready · Reload" banner appears so the user can apply it whenever's convenient — it never reloads on its own, since unsaved presentation content isn't auto-saved.
+
 ## 🗂 Project Structure
 
 ```

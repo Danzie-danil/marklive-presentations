@@ -86,6 +86,23 @@
     text-transform:uppercase;
     letter-spacing:0.08em;
   }
+  .version-badge{
+    appearance:none;
+    border:1px solid rgba(255,255,255,0.14);
+    background:rgba(255,255,255,0.06);
+    color:var(--bar-text);
+    font-family:inherit;
+    font-size:9.5px;
+    font-weight:600;
+    letter-spacing:.02em;
+    padding:2px 6px;
+    border-radius:20px;
+    cursor:pointer;
+    line-height:1.3;
+    flex-shrink:0;
+    transition:background .15s, color .15s;
+  }
+  .version-badge:hover{ background:rgba(255,255,255,0.16); color:#fff; }
   .toolbar-actions{
     display:flex;
     gap:5px;
@@ -480,6 +497,12 @@
     margin-top:16px;
     width:100%;
   }
+  .release-entry{ margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid #efece4; }
+  .release-entry:last-child{ margin-bottom:0; padding-bottom:0; border-bottom:none; }
+  .release-version{ font-weight:700; font-size:14px; color:var(--ink); }
+  .release-date{ font-size:11px; color:#9b9384; font-weight:500; margin-left:6px; }
+  .release-changes{ margin:8px 0 0; padding-left:18px; font-size:13px; color:#4a4339; }
+  .release-changes li{ margin-bottom:4px; }
 
   /* ---------- Toast ---------- */
   .toast{
@@ -499,6 +522,31 @@
     white-space:nowrap;
   }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* ---------- Update-ready banner ---------- */
+  .update-banner{
+    position:fixed;
+    top:calc(var(--toolbar-h) + env(safe-area-inset-top,0px) + 10px);
+    left:50%;
+    transform:translateX(-50%);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:#1d212a;
+    color:#fff;
+    padding:9px 10px 9px 14px;
+    border-radius:10px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.08);
+    z-index:95;
+    font-size:13px;
+    max-width:calc(100vw - 24px);
+  }
+  .update-banner[hidden]{ display:none !important; }
+  .update-banner span{ white-space:nowrap; }
+  .update-dismiss{
+    background:none; border:none; color:#9aa0ad; font-size:15px; cursor:pointer; padding:2px 5px; line-height:1;
+  }
+  .update-dismiss:hover{ color:#fff; }
 
   /* ---------- Edit mode (batch line editing) ---------- */
   .editmode-backdrop{
@@ -763,6 +811,7 @@
   /* ---------- Very small phones (≤380px) ---------- */
   @media (max-width:380px){
     .brand{ font-size:12px; }
+    .version-badge{ display:none; }
     #btnImport{ display:none; }
     .page-nav .btn{ font-size:10.5px; padding:3px 7px; }
     #pageIndicator{ font-size:10.5px; min-width:64px; }
@@ -846,9 +895,10 @@
     flex-shrink: 0;
   }
   .save-menu{
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
+    /* position:fixed (not absolute) so the menu isn't clipped by the
+       mobile toolbar's overflow-x:auto scroller — its on-screen spot is
+       computed in JS via positionSaveMenu() each time it opens. */
+    position: fixed;
     min-width: 200px;
     background: #fff;
     border-radius: 10px;
@@ -889,7 +939,7 @@
 <div class="app">
 
   <header class="toolbar">
-    <div class="brand"><span class="dot">●</span> MarkLive <span class="tag">Presentations</span></div>
+    <div class="brand"><span class="dot">●</span> MarkLive <span class="tag">Presentations</span><button class="version-badge" id="btnReleases" type="button" title="What's new"></button></div>
     <div class="toolbar-actions">
       <button class="btn" id="btnUndo" type="button" title="Undo (Ctrl+Z)" disabled>↩ Undo</button>
       <button class="btn" id="btnRedo" type="button" title="Redo (Ctrl+Y)" disabled>↪ Redo</button>
@@ -1009,7 +1059,23 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="releasesBackdrop" hidden>
+    <div class="modal">
+      <h2>What's new</h2>
+      <div class="sub">Release notes for MarkLive Presentations.</div>
+      <div id="releasesList"></div>
+      <button class="btn primary modal-close" id="btnCloseReleases" type="button">Got it</button>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
+
+  <!-- Shown once a background update has finished installing -->
+  <div class="update-banner" id="updateBanner" hidden>
+    <span>Update ready</span>
+    <button class="btn primary" id="btnReloadUpdate" type="button">Reload</button>
+    <button class="update-dismiss" id="btnDismissUpdate" type="button" aria-label="Dismiss">✕</button>
+  </div>
 
   <!-- Selection format bar -->
   <div id="selectionBar">
@@ -1028,6 +1094,39 @@
 <script>
 (function(){
   "use strict";
+
+  /* =========================================================
+     Version + release notes
+     ---------------------------------------------------------
+     To ship an update:
+       1) Add a new entry to the TOP of CHANGELOG below describing
+          what changed/what was fixed.
+       2) Bump SW_VERSION in sw.js to that same version string —
+          that one-line change is what makes browsers notice the
+          service worker file changed, install the update, and
+          rotate the offline cache. Without it, the network-first
+          fetch strategy will still deliver fresh content whenever
+          the device is online, but the offline cache won't rotate.
+  ========================================================= */
+  var CHANGELOG = [
+    {
+      version: '1.1.0',
+      date: 'June 2026',
+      changes: [
+        'Fixed: the Save menu could be clipped off-screen and silently fail to open on mobile.',
+        'Fixed: the installed app now checks for and applies updates automatically — no more uninstalling/reinstalling to get the latest version.',
+        "Added: this release notes dialog, so you can always see what's changed."
+      ]
+    },
+    {
+      version: '1.0.0',
+      date: 'Earlier',
+      changes: [
+        'Initial release — live markdown board, multi-page support, page-aware save/import, offline PWA.'
+      ]
+    }
+  ];
+  var APP_VERSION = CHANGELOG[0].version;
 
   /* =========================================================
      Markdown renderer (self-contained, no dependencies)
@@ -2071,11 +2170,36 @@
 
   function closeSaveMenu(){ saveMenu.hidden = true; }
 
+  /* Computes a viewport-relative position for the (now fixed) save menu,
+     anchored under the Save button and clamped so it never runs off
+     either edge of the screen on narrow phones. */
+  function positionSaveMenu(){
+    var rect = btnSaveMenu.getBoundingClientRect();
+    var menuW = saveMenu.offsetWidth || 200;
+    var left = rect.right - menuW;
+    var minLeft = 8;
+    var maxLeft = window.innerWidth - menuW - 8;
+    if (left < minLeft) left = minLeft;
+    if (left > maxLeft) left = maxLeft;
+    saveMenu.style.left = left + 'px';
+    saveMenu.style.top = (rect.bottom + 6) + 'px';
+  }
+
   btnSaveMenu.addEventListener('click', function(e){
     e.stopPropagation();
     var wasHidden = saveMenu.hidden;
-    saveMenu.hidden = !wasHidden;
-    if (wasHidden){ saveMenuJustOpened = true; }
+    if (wasHidden){
+      saveMenu.hidden = false;
+      positionSaveMenu();
+      saveMenuJustOpened = true;
+    } else {
+      saveMenu.hidden = true;
+    }
+  });
+
+  /* Keep it anchored correctly if the viewport rotates/resizes while open */
+  window.addEventListener('resize', function(){
+    if (!saveMenu.hidden) positionSaveMenu();
   });
 
   /* Close when clicking anywhere outside the dropdown */
@@ -2407,6 +2531,42 @@
   document.addEventListener('keydown', function(ev){
     if (ev.key === 'Escape' && !helpBackdrop.hidden) helpBackdrop.hidden = true;
   });
+
+  /* ---------- Releases / What's new ---------- */
+  var releasesBackdrop = document.getElementById('releasesBackdrop');
+  var releasesList = document.getElementById('releasesList');
+  var btnReleases = document.getElementById('btnReleases');
+
+  function renderReleases(){
+    releasesList.innerHTML = CHANGELOG.map(function(entry){
+      var items = entry.changes.map(function(c){ return '<li>' + c + '</li>'; }).join('');
+      return '<div class="release-entry">' +
+        '<span class="release-version">v' + entry.version + '</span>' +
+        '<span class="release-date">' + entry.date + '</span>' +
+        '<ul class="release-changes">' + items + '</ul>' +
+        '</div>';
+    }).join('');
+  }
+
+  function openReleases(){ renderReleases(); releasesBackdrop.hidden = false; }
+  function closeReleases(){ releasesBackdrop.hidden = true; }
+
+  btnReleases.textContent = 'v' + APP_VERSION;
+  btnReleases.addEventListener('click', openReleases);
+  document.getElementById('btnCloseReleases').addEventListener('click', closeReleases);
+  releasesBackdrop.addEventListener('click', function(ev){ if (ev.target === releasesBackdrop) closeReleases(); });
+  document.addEventListener('keydown', function(ev){
+    if (ev.key === 'Escape' && !releasesBackdrop.hidden) closeReleases();
+  });
+
+  /* Auto-show once per update: if this browser last saw a different
+     version, pop the dialog open so the change is hard to miss — but
+     never on a brand-new install, only after an actual update. */
+  try {
+    var lastSeenVersion = localStorage.getItem('marklive_lastSeenVersion');
+    localStorage.setItem('marklive_lastSeenVersion', APP_VERSION);
+    if (lastSeenVersion && lastSeenVersion !== APP_VERSION) openReleases();
+  } catch (e) { /* localStorage unavailable — skip auto-show */ }
 
   /* ---------- divider drag resize ---------- */
   var dragging = false;
@@ -2864,14 +3024,53 @@
 })();
 </script>
 <script>
-  /* Register service worker for offline support */
+  /* Register service worker for offline support + auto-update detection.
+     We never force a reload on our own — this app keeps everything
+     in memory with no autosave, so an unannounced reload mid-presentation
+     could wipe unsaved work. Instead: the cache updates itself silently in
+     the background, and we show a small "Reload" banner the moment a new
+     version has finished installing, letting the user pick the moment. */
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-      navigator.serviceWorker.register('sw.js').catch(function(){
+      navigator.serviceWorker.register('sw.js').then(function(reg){
+
+        function flagUpdateReady(){
+          var banner = document.getElementById('updateBanner');
+          if (banner) banner.hidden = false;
+        }
+
+        /* A new SW just finished installing. If there's already a
+           controller, this isn't the first install — it's an update. */
+        reg.addEventListener('updatefound', function(){
+          var installingSW = reg.installing;
+          if (!installingSW) return;
+          installingSW.addEventListener('statechange', function(){
+            if (installingSW.state === 'installed' && navigator.serviceWorker.controller) {
+              flagUpdateReady();
+            }
+          });
+        });
+
+        /* Proactively ask the browser to re-check sw.js for changes
+           rather than waiting on its own slower default schedule —
+           this is what makes a fresh GitHub Pages deploy show up
+           without anyone having to uninstall/reinstall the app. */
+        document.addEventListener('visibilitychange', function(){
+          if (document.visibilityState === 'visible') reg.update();
+        });
+        setInterval(function(){ reg.update(); }, 60 * 60 * 1000);
+
+      }).catch(function(){
         /* SW registration failed — app still works online */
       });
     });
   }
+
+  var updateBanner = document.getElementById('updateBanner');
+  var btnReloadUpdate = document.getElementById('btnReloadUpdate');
+  var btnDismissUpdate = document.getElementById('btnDismissUpdate');
+  if (btnReloadUpdate) btnReloadUpdate.addEventListener('click', function(){ window.location.reload(); });
+  if (btnDismissUpdate) btnDismissUpdate.addEventListener('click', function(){ updateBanner.hidden = true; });
 </script>
 </body>
 </html>
