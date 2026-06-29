@@ -1967,6 +1967,7 @@
     editor.value = Array.prototype.map.call(preview.childNodes, function(node){
       return blockMarkdown(node);
     }).filter(function(text){ return text.trim() !== ''; }).join('\n\n');
+    scheduleAutosave();
   }
 
   updatePreview = function(){
@@ -2045,6 +2046,7 @@
     sel.removeAllRanges();
     sel.addRange(range);
     savedSelection = range.cloneRange();
+    scheduleAutosave();
   }
 
   function doUndo(){
@@ -2106,6 +2108,59 @@
     pages[currentPage] = editor.value;
   }
 
+  /* =========================================================
+     Autosave to localStorage
+     ---------------------------------------------------------
+     Keeps a debounced snapshot of {pages, currentPage} in
+     localStorage so a crash, closed tab, or power loss doesn't
+     wipe the user's work. Restored automatically on next load
+     (see "Initial setup" below), with a small toast confirming
+     what happened so it's never a silent surprise.
+  ========================================================= */
+  var AUTOSAVE_KEY = 'marklive_autosave_v1';
+  var autosaveTimer = null;
+  var autosaveSuppressed = false; // true while we're loading from storage
+
+  function persistAutosave(){
+    if (autosaveSuppressed) return;
+    try {
+      saveCurrentPageContent();
+      var payload = {
+        pages: pages,
+        currentPage: currentPage,
+        savedAt: Date.now()
+      };
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload));
+    } catch (e) { /* localStorage full or unavailable — fail silently */ }
+  }
+
+  function scheduleAutosave(){
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(persistAutosave, 600);
+  }
+
+  function clearAutosave(){
+    try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) { /* ignore */ }
+  }
+
+  function readAutosave(){
+    try {
+      var raw = localStorage.getItem(AUTOSAVE_KEY);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (!parsed || !Array.isArray(parsed.pages) || !parsed.pages.length) return null;
+      return parsed;
+    } catch (e) { return null; }
+  }
+
+  /* Save on tab close / app backgrounded too, so the very last
+     keystrokes before a crash or accidental close aren't lost
+     waiting on the debounce timer. */
+  window.addEventListener('beforeunload', persistAutosave);
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'hidden') persistAutosave();
+  });
+
   function loadPage(idx){
     saveCurrentPageContent();
     currentPage = idx;
@@ -2131,6 +2186,7 @@
     updateHistoryButtons();
     updatePageNav();
     preview.focus();
+    scheduleAutosave();
   }
 
   function goToPrevPage(){
@@ -2652,7 +2708,94 @@
     }
   });
 
+  /* =========================================================
+     Auto-formatting while typing
+     ---------------------------------------------------------
+     "1. " (digits + period + space) typed at the very start of
+     an empty-ish line converts that line into a real <ol> list,
+     mirroring what the slash-menu's "Numbered list" command does.
+  ========================================================= */
+  function tryAutoNumberedList(){
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+    var range = sel.getRangeAt(0);
+    var node = range.startContainer;
+    if (node.nodeType !== 3) return false; // only plain text nodes
+
+    var textBefore = node.textContent.slice(0, range.startOffset);
+    var match = textBefore.match(/^(\d+)\.\s$/);
+    if (!match) return false;
+
+    // Must be the very start of its block (no other text before it).
+    var block = closestBlock();
+    if (!block || block.nodeName === 'LI') return false; // already a list item
+    var blockTextBefore = '';
+    var walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, null);
+    var n;
+    while ((n = walker.nextNode())){
+      if (n === node) break;
+      blockTextBefore += n.textContent;
+    }
+    if (blockTextBefore.trim() !== '') return false;
+
+    // Only auto-convert lists starting at 1 — "5. " etc. is more likely
+    // intentional body text than a list the user wants renumbered.
+    if (match[1] !== '1') return false;
+
+    // Strip the typed "1. " trigger text, then promote the block to <ol>.
+    node.textContent = node.textContent.slice(0, range.startOffset - match[0].length) +
+                        node.textContent.slice(range.startOffset);
+    var caretRange = document.createRange();
+    caretRange.setStart(node, range.startOffset - match[0].length);
+    caretRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caretRange);
+    savedSelection = caretRange.cloneRange();
+
+    document.execCommand('insertOrderedList', false, null);
+    return true;
+  }
+
+  /* Capitalizes the first letter of a block the moment it's typed —
+     covers the start of a brand-new paragraph/list item/heading, not
+     letters typed later mid-sentence. Skips inside code blocks, where
+     case is often meaningful (e.g. variable names). */
+  function tryAutoCapitalize(){
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
+    var range = sel.getRangeAt(0);
+    var node = range.startContainer;
+    if (node.nodeType !== 3) return;
+    if (range.startOffset !== 1) return; // only the very first character typed
+
+    var block = closestBlock();
+    if (!block || block.nodeName === 'PRE') return;
+
+    // Confirm no other text precedes this character within the block
+    // (covers list items, headings, quotes, and plain paragraphs alike).
+    var walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, null);
+    var n;
+    while ((n = walker.nextNode())){
+      if (n === node) break;
+      if (n.textContent.length) return;
+    }
+
+    var ch = node.textContent.charAt(0);
+    var upper = ch.toUpperCase();
+    if (ch === upper) return; // not a lowercase letter (number, symbol, already capital)
+
+    node.textContent = upper + node.textContent.slice(1);
+    var caretRange = document.createRange();
+    caretRange.setStart(node, range.startOffset);
+    caretRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caretRange);
+    savedSelection = caretRange.cloneRange();
+  }
+
   preview.addEventListener('input', function(){
+    var convertedToList = tryAutoNumberedList();
+    if (!convertedToList) tryAutoCapitalize();
     updateMarkdownFromBoard();
     saveBoardSelection();
     schedulePush();
@@ -3037,14 +3180,31 @@
   }
 
   /* ---------- Initial setup ---------- */
-  editor.value = DEMO_TEXT;
-  updatePreview();
-  updateEmptyState();
-  updateStats();
-  undoStack.push(captureSnapshot());
-  updateHistoryButtons();
-  pages[0] = DEMO_TEXT;
-  updatePageNav();
+  var restored = readAutosave();
+  if (restored && restored.pages.some(function(p){ return p.trim() !== ''; })){
+    autosaveSuppressed = true;
+    pages = restored.pages;
+    currentPage = Math.min(restored.currentPage || 0, pages.length - 1);
+    editor.value = pages[currentPage];
+    demoTextCleared = true;
+    updatePreview();
+    updateEmptyState();
+    updateStats();
+    autosaveSuppressed = false;
+    undoStack.push(captureSnapshot());
+    updateHistoryButtons();
+    updatePageNav();
+    showToast('Restored your last session');
+  } else {
+    editor.value = DEMO_TEXT;
+    updatePreview();
+    updateEmptyState();
+    updateStats();
+    undoStack.push(captureSnapshot());
+    updateHistoryButtons();
+    pages[0] = DEMO_TEXT;
+    updatePageNav();
+  }
 
 })();
 </script>
