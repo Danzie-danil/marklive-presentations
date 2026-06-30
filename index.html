@@ -1956,14 +1956,7 @@
     var replacement = document.createElement(tagName);
     replacement.innerHTML = block.innerHTML || '<br>';
     block.parentNode.replaceChild(replacement, block);
-    if (/^H[1-6]$/i.test(tagName)){
-      var next = document.createElement('p');
-      next.innerHTML = '<br>';
-      replacement.parentNode.insertBefore(next, replacement.nextSibling);
-      placeCaretInside(next);
-    } else {
-      placeCaretInside(replacement);
-    }
+    placeCaretInside(replacement);
     updateMarkdownFromBoard();
   }
 
@@ -1989,10 +1982,23 @@
         changeBlock('blockquote');
       } else if (item.prefix === '- [ ] '){
         restoreBoardSelection();
-        var box = document.createElement('p');
-        box.innerHTML = '<input type="checkbox" disabled> Checklist item';
-        preview.appendChild(box);
-        placeCaretInside(box);
+        var existingLi = closestBlock();
+        if (!existingLi || existingLi.nodeName !== 'LI'){
+          document.execCommand('insertUnorderedList', false, null);
+        }
+        var liBlock = closestBlock();
+        if (liBlock && liBlock.nodeName === 'LI'){
+          var existingCheckbox = liBlock.querySelector('input[type="checkbox"]');
+          if (!existingCheckbox){
+            var checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.disabled = true;
+            liBlock.insertBefore(checkbox, liBlock.firstChild);
+            liBlock.insertBefore(document.createTextNode(' '), checkbox.nextSibling);
+          }
+          if (!liBlock.textContent.trim()) liBlock.appendChild(document.createTextNode('Checklist item'));
+          placeCaretInside(liBlock);
+        }
         updateMarkdownFromBoard();
       }
       return;
