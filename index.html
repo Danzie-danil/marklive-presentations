@@ -203,6 +203,25 @@
     overflow-y:auto;
   }
 
+  /* ---------- Read-only Final Preview mode ---------- */
+  #btnPreviewMode.active{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  .app.previewing .live-preview{ caret-color:transparent; cursor:default; }
+  .app.previewing #cursorFab,
+  .app.previewing #selectionBar,
+  .app.previewing .new-page{ display:none !important; }
+  .app.previewing .pane-label{ color:var(--accent); }
+  .app.previewing #paneLabelTitle::before{
+    content:'PREVIEW';
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.08em;
+    background:var(--accent);
+    color:var(--accent-ink);
+    border-radius:4px;
+    padding:2px 6px;
+    margin-right:8px;
+  }
+
   /* ---------- Page navigation bar (sticky bottom) ---------- */
   .page-nav{
     flex:0 0 auto;
@@ -347,6 +366,7 @@
   .preview pre code{ background:none; padding:0; }
   .preview hr{ border:none; border-top:1px solid var(--paper-border); margin:1.4em 0; }
   .preview a{ color:var(--teal); text-decoration:underline; }
+  .preview img{ max-width:100%; height:auto; border-radius:8px; display:block; margin:.6em 0; }
   .preview table{ border-collapse:collapse; margin:.6em 0; width:100%; }
   .preview th,.preview td{ border:1px solid var(--paper-border); padding:6px 10px; text-align:left; font-size:.95em; }
   .preview th{ background:rgba(27,35,48,0.04); }
@@ -470,6 +490,40 @@
   .slash-item.active{ background:#fbeed6; }
   .slash-item.active .slash-item-icon{ background:var(--accent); color:#fff; }
   .slash-empty{ padding:14px 10px; color:#9aa0ad; font-size:13px; }
+
+  /* ---------- Table size picker (grid hover-select) ---------- */
+  .table-picker{ padding:4px 2px; }
+  .table-picker-back{
+    display:flex; align-items:center; gap:6px;
+    width:100%; background:none; border:none;
+    padding:6px 8px; margin-bottom:4px;
+    font-family:inherit; font-size:12.5px; font-weight:600;
+    color:#80766a; cursor:pointer; border-radius:7px;
+  }
+  .table-picker-back:hover{ background:#f1efe9; color:var(--ink); }
+  .table-picker-label{
+    text-align:center; font-size:13px; font-weight:600;
+    color:var(--ink); padding:2px 0 8px;
+  }
+  .table-picker-grid{
+    display:grid;
+    grid-template-columns:repeat(8, 1fr);
+    gap:3px;
+    padding:0 8px 8px;
+  }
+  .table-picker-cell{
+    width:20px; height:20px;
+    border-radius:3px;
+    background:#f1efe9;
+    border:1px solid var(--paper-border);
+  }
+  .table-picker-cell.lit{
+    background:var(--accent);
+    border-color:var(--accent);
+  }
+  .table-picker-hint{
+    text-align:center; font-size:11px; color:#9aa0ad; padding:0 8px 4px;
+  }
 
   /* ---------- Modal ---------- */
   .modal-backdrop{
@@ -946,6 +1000,7 @@
       <button class="btn" id="btnImport" type="button">Import</button>
       <input type="file" id="importInput" accept=".md,.txt,text/markdown,text/plain" style="display:none">
       <button class="btn" id="btnEditMode" type="button">Edit Mode</button>
+      <button class="btn" id="btnPreviewMode" type="button" title="Toggle read-only preview (Ctrl+P)">Preview</button>
       <button class="btn" id="btnHelp" type="button">Shortcuts</button>
       <button class="btn" id="btnCopy" type="button">Copy</button>
       <!-- Save dropdown -->
@@ -963,8 +1018,8 @@
   <main class="workspace live" id="workspace">
     <section class="pane live-pane">
       <div class="pane-label">
-        <span>Live Board</span>
-        <span class="hint">Type <kbd>\</kbd> or <kbd>/</kbd> for formats · tap ⊞ or select text · <kbd>]</kbd> to exit</span>
+        <span id="paneLabelTitle">Live Board</span>
+        <span class="hint" id="paneLabelHint">Type <kbd>\</kbd> or <kbd>/</kbd> for formats · tap ⊞ or select text · <kbd>]</kbd> to exit</span>
       </div>
       <div class="live-canvas" id="liveCanvas" data-placeholder="Nothing here yet — start typing your presentation." data-empty="false">
         <div class="preview live-preview" id="preview" contenteditable="true" spellcheck="false" aria-label="Live presentation board"></div>
@@ -1051,8 +1106,10 @@
         <tr><td>Underline</td><td><kbd>Ctrl</kbd>+<kbd>U</kbd></td></tr>
         <tr><td>Strikethrough</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd></td></tr>
         <tr><td>Link</td><td><kbd>Ctrl</kbd>+<kbd>K</kbd></td></tr>
+        <tr><td>Indent / outdent list item</td><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td></tr>
         <tr><td>Previous page</td><td><kbd>Ctrl</kbd>+<kbd>←</kbd></td></tr>
         <tr><td>Next page</td><td><kbd>Ctrl</kbd>+<kbd>→</kbd></td></tr>
+        <tr><td>Toggle read-only preview</td><td><kbd>Ctrl</kbd>+<kbd>P</kbd></td></tr>
         <tr><td>Save .md (current page)</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td></tr>
       </table>
       <button class="btn primary modal-close" id="btnCloseHelp" type="button">Got it</button>
@@ -1153,6 +1210,7 @@
       str = str.replace(/\*([^*]+)\*/g, '<em>$1</em>');
       str = str.replace(/~~([^~]+)~~/g, '<del>$1</del>');
       str = str.replace(/\+\+([^+]+)\+\+/g, '<u>$1</u>');
+      str = str.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" loading="lazy">');
       str = str.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
       str = str.replace(/@@(\d+)@@/g, function(m, idx){ return stash[idx]; });
       return str;
@@ -1161,6 +1219,64 @@
     var lines = text.split('\n');
     var html = [];
     var i = 0;
+
+    /* ---------- Lists (bullet, numbered, checklist) — indentation-aware,
+       so a line indented deeper than its preceding list item becomes a
+       nested sub-list inside that item. Mixing list types across nesting
+       levels is allowed (e.g. a numbered sub-list inside a bullet item). */
+    function getListLineInfo(ln){
+      var checklistMatch = ln.match(/^(\s*)[-*]\s+\[([ xX])\]\s+(.*)$/);
+      if (checklistMatch){
+        return { indent: checklistMatch[1].length, type: 'checklist', checked: checklistMatch[2].toLowerCase() === 'x', content: checklistMatch[3] };
+      }
+      var bulletMatch = ln.match(/^(\s*)[-*]\s+(.*)$/);
+      if (bulletMatch) return { indent: bulletMatch[1].length, type: 'ul', content: bulletMatch[2] };
+      var numberedMatch = ln.match(/^(\s*)\d+\.\s+(.*)$/);
+      if (numberedMatch) return { indent: numberedMatch[1].length, type: 'ol', content: numberedMatch[2] };
+      return null;
+    }
+
+    /* Consumes a run of list lines with indent >= minIndent, returning the
+       rendered <ul>/<ol> HTML and the index just past what it consumed.
+       A change in list type (bullet / numbered / checklist) at this same
+       indent level ends the current list rather than folding into it —
+       e.g. a bullet list immediately followed by a numbered list (with no
+       blank line between) renders as two separate lists, not one. */
+    function parseListBlock(idx, minIndent){
+      var listType = null; // 'ul' | 'ol' | 'checklist' — the kind established by the first line
+      var items = [];
+
+      while (idx < lines.length){
+        var info = getListLineInfo(lines[idx]);
+        if (!info || info.indent < minIndent) break;
+        if (listType === null) listType = info.type;
+        if (info.type !== listType) break; // different kind at the same level — stop here
+
+        var itemHtml = info.type === 'checklist'
+          ? '<li><input type="checkbox" disabled ' + (info.checked ? 'checked' : '') + '> ' + inline(info.content) + '</li>'
+          : '<li>' + inline(info.content) + '</li>';
+        idx++;
+
+        /* Lookahead: deeper-indented list lines that follow become a
+           nested list inside the <li> we just built. */
+        var nestedHtml = '';
+        while (idx < lines.length){
+          var nextInfo = getListLineInfo(lines[idx]);
+          if (!nextInfo || nextInfo.indent <= minIndent) break;
+          var nested = parseListBlock(idx, nextInfo.indent);
+          nestedHtml += nested.html;
+          idx = nested.nextIndex;
+        }
+        if (nestedHtml) itemHtml = itemHtml.slice(0, -5) + nestedHtml + '</li>';
+        items.push(itemHtml);
+      }
+
+      var tag = listType === 'ol' ? 'ol' : 'ul';
+      var cls = listType === 'checklist' ? ' class="checklist"' : '';
+      var listHtml = items.length ? '<' + tag + cls + '>' + items.join('') + '</' + tag + '>' : '';
+      return { html: listHtml, nextIndex: idx };
+    }
+
     while (i < lines.length){
       var line = lines[i];
 
@@ -1185,35 +1301,10 @@
         continue;
       }
 
-      if (/^\s*[-*]\s+\[[ xX]\]\s+/.test(line)){
-        var items = [];
-        while (i < lines.length && /^\s*[-*]\s+\[[ xX]\]\s+/.test(lines[i])){
-          var m = lines[i].match(/^\s*[-*]\s+\[([ xX])\]\s+(.*)$/);
-          var checked = m[1].toLowerCase() === 'x';
-          items.push('<li><input type="checkbox" disabled '+(checked?'checked':'')+'> '+inline(m[2])+'</li>');
-          i++;
-        }
-        html.push('<ul class="checklist">'+items.join('')+'</ul>');
-        continue;
-      }
-
-      if (/^\s*[-*]\s+/.test(line)){
-        var items2 = [];
-        while (i < lines.length && /^\s*[-*]\s+/.test(lines[i]) && !/^\s*[-*]\s+\[[ xX]\]/.test(lines[i])){
-          items2.push('<li>'+inline(lines[i].replace(/^\s*[-*]\s+/, ''))+'</li>');
-          i++;
-        }
-        html.push('<ul>'+items2.join('')+'</ul>');
-        continue;
-      }
-
-      if (/^\s*\d+\.\s+/.test(line)){
-        var items3 = [];
-        while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])){
-          items3.push('<li>'+inline(lines[i].replace(/^\s*\d+\.\s+/, ''))+'</li>');
-          i++;
-        }
-        html.push('<ol>'+items3.join('')+'</ol>');
+      if (getListLineInfo(line)){
+        var listResult = parseListBlock(i, 0);
+        html.push(listResult.html);
+        i = listResult.nextIndex;
         continue;
       }
 
@@ -1310,10 +1401,11 @@
       {label:'Quote', icon:'❝', type:'line', prefix:'> '},
       {label:'Code block', icon:'{ }', type:'block', before:'```\n', after:'\n```', placeholder:'code here'},
       {label:'Divider', icon:'—', type:'insert', text:'\n---\n'},
-      {label:'Table', icon:'▦', type:'insert', text:'| Column 1 | Column 2 |\n| --- | --- |\n| Cell | Cell |\n'}
+      {label:'Table', icon:'▦', type:'table-picker'}
     ]},
     { label:'Insert', items:[
-      {label:'Link', icon:'🔗', type:'link'}
+      {label:'Link', icon:'🔗', type:'link'},
+      {label:'Image', icon:'🖼', type:'image'}
     ]}
   ];
 
@@ -1379,6 +1471,7 @@
   }
 
   function renderMenu(){
+    tablePickerOpen = false;
     slashGroups.innerHTML = '';
     flatItems = [];
     MENU_GROUPS.forEach(function(group){
@@ -1399,7 +1492,11 @@
         btn.type = 'button';
         btn.className = 'slash-item';
         btn.innerHTML = '<span class="slash-item-icon">'+it.icon+'</span><span class="slash-item-label">'+it.label+'</span>';
-        btn.addEventListener('mousedown', function(e){ e.preventDefault(); commitItem(it); });
+        btn.addEventListener('mousedown', function(e){
+          e.preventDefault();
+          if (it.type === 'table-picker') renderTablePicker();
+          else commitItem(it);
+        });
         groupEl.appendChild(btn);
         flatItems.push({item:it, el:btn});
       });
@@ -1418,6 +1515,96 @@
   function highlightActive(){
     flatItems.forEach(function(f, idx){ f.el.classList.toggle('active', idx === activeIndex); });
     if (flatItems[activeIndex]) flatItems[activeIndex].el.scrollIntoView({block:'nearest'});
+  }
+
+  /* ---------- Table size picker ---------- */
+  var TABLE_PICKER_MAX_COLS = 8;
+  var TABLE_PICKER_MAX_ROWS = 6;
+  var tablePickerOpen = false;
+  var tablePickerRows = 2;
+  var tablePickerCols = 2;
+  var tablePickerCells = [];
+  var tablePickerLabel = null;
+
+  function buildTableMarkdown(rows, cols){
+    var headerCells = [];
+    for (var c = 0; c < cols; c++) headerCells.push('Column ' + (c + 1));
+    var sepCells = headerCells.map(function(){ return '---'; });
+    var lines = ['| ' + headerCells.join(' | ') + ' |', '| ' + sepCells.join(' | ') + ' |'];
+    for (var r = 0; r < rows; r++){
+      var rowCells = [];
+      for (var c2 = 0; c2 < cols; c2++) rowCells.push('Cell');
+      lines.push('| ' + rowCells.join(' | ') + ' |');
+    }
+    return lines.join('\n') + '\n';
+  }
+
+  function insertTable(rows, cols){
+    tablePickerOpen = false;
+    commitItem({ type:'insert', text: buildTableMarkdown(rows, cols) });
+  }
+
+  function updateGridHighlight(rows, cols){
+    rows = Math.max(1, Math.min(TABLE_PICKER_MAX_ROWS, rows));
+    cols = Math.max(1, Math.min(TABLE_PICKER_MAX_COLS, cols));
+    tablePickerRows = rows;
+    tablePickerCols = cols;
+    if (tablePickerLabel) tablePickerLabel.textContent = rows + ' × ' + cols + ' table';
+    tablePickerCells.forEach(function(cell, idx){
+      var cr = Math.floor(idx / TABLE_PICKER_MAX_COLS) + 1;
+      var cc = (idx % TABLE_PICKER_MAX_COLS) + 1;
+      cell.classList.toggle('lit', cr <= rows && cc <= cols);
+    });
+  }
+
+  function renderTablePicker(){
+    tablePickerOpen = true;
+    tablePickerRows = 2;
+    tablePickerCols = 2;
+    tablePickerCells = [];
+    tablePickerLabel = null;
+    flatItems = []; // arrow-key/Enter list-navigation is suspended while the grid is open
+
+    slashGroups.innerHTML = '';
+    var wrap = document.createElement('div');
+    wrap.className = 'table-picker';
+
+    var backBtn = document.createElement('button');
+    backBtn.type = 'button';
+    backBtn.className = 'table-picker-back';
+    backBtn.innerHTML = '← Back';
+    backBtn.addEventListener('mousedown', function(e){ e.preventDefault(); tablePickerOpen = false; renderMenu(); });
+    wrap.appendChild(backBtn);
+
+    var label = document.createElement('div');
+    label.className = 'table-picker-label';
+    wrap.appendChild(label);
+    tablePickerLabel = label;
+
+    var grid = document.createElement('div');
+    grid.className = 'table-picker-grid';
+    grid.style.gridTemplateColumns = 'repeat(' + TABLE_PICKER_MAX_COLS + ', 1fr)';
+    for (var r = 0; r < TABLE_PICKER_MAX_ROWS; r++){
+      for (var c = 0; c < TABLE_PICKER_MAX_COLS; c++){
+        var cell = document.createElement('div');
+        cell.className = 'table-picker-cell';
+        (function(rr, cc){
+          cell.addEventListener('mouseenter', function(){ updateGridHighlight(rr+1, cc+1); });
+          cell.addEventListener('mousedown', function(e){ e.preventDefault(); insertTable(rr+1, cc+1); });
+        })(r, c);
+        grid.appendChild(cell);
+        tablePickerCells.push(cell);
+      }
+    }
+    wrap.appendChild(grid);
+
+    var hint = document.createElement('div');
+    hint.className = 'table-picker-hint';
+    hint.textContent = 'Click a cell to insert, or use arrow keys + Enter';
+    wrap.appendChild(hint);
+
+    updateGridHighlight(tablePickerRows, tablePickerCols);
+    slashGroups.appendChild(wrap);
   }
 
   function getRenderedCaretRect(){
@@ -1826,6 +2013,24 @@
       updateMarkdownFromBoard();
       return;
     }
+    if (item.type === 'image'){
+      restoreBoardSelection();
+      var imgUrl = window.prompt('Image URL:', 'https://');
+      if (!imgUrl) return; // user cancelled or left it blank — insert nothing
+      var imgAlt = window.prompt('Alt text (optional, for accessibility):', '') || '';
+      var selImg = window.getSelection();
+      if (!selImg || !selImg.rangeCount) return;
+      var rangeImg = selImg.getRangeAt(0);
+      rangeImg.deleteContents();
+      var img = document.createElement('img');
+      img.src = imgUrl;
+      img.alt = imgAlt;
+      img.loading = 'lazy';
+      rangeImg.insertNode(img);
+      placeCaretAfter(img);
+      updateMarkdownFromBoard();
+      return;
+    }
     if (item.type === 'block' && item.before && item.before.indexOf('```') === 0){
       restoreBoardSelection();
       var pre = document.createElement('pre');
@@ -1929,8 +2134,43 @@
     if (tag === 'del' || tag === 's' || tag === 'strike') return '~~' + text + '~~';
     if (tag === 'code') return '`' + text.replace(/`/g, '\\`') + '`';
     if (tag === 'a') return '[' + text + '](' + (node.getAttribute('href') || '') + ')';
-    if (tag === 'input' && node.type === 'checkbox') return node.checked ? '[x] ' : '[ ] ';
+    if (tag === 'img') return '![' + (node.getAttribute('alt') || '') + '](' + (node.getAttribute('src') || '') + ')';
+    if (tag === 'input' && node.type === 'checkbox') return node.checked ? '[x]' : '[ ]';
     return text;
+  }
+
+  /* Serializes a <ul>/<ol> (possibly containing nested <ul>/<ol> inside its
+     <li>s) back to indented markdown. `indent` is the leading-space count
+     for this level — each nested level adds 2 more, matching the indent
+     unit the parser in renderMarkdown() recognizes. */
+  function listMarkdown(node, indent){
+    var tag = node.nodeName.toLowerCase();
+    var pad = new Array(indent + 1).join(' ');
+    var n = 1;
+    var lines = [];
+    Array.prototype.forEach.call(node.children, function(li){
+      if (li.nodeName.toLowerCase() !== 'li') return;
+      // An <li> may contain its own inline content plus a nested <ul>/<ol>;
+      // serialize those separately so the nested list gets its own indent
+      // rather than being flattened into the parent item's text.
+      var nestedLists = [];
+      var ownNodes = [];
+      Array.prototype.forEach.call(li.childNodes, function(child){
+        if (child.nodeType === 1 && /^(ul|ol)$/i.test(child.nodeName)) nestedLists.push(child);
+        else ownNodes.push(child);
+      });
+      // inlineMarkdown already renders a checkbox child as "[x]"/"[ ]",
+      // so a checklist item's full text (e.g. "[ ] buy milk") falls
+      // straight out of this join — no special-casing needed here.
+      var ownText = ownNodes.map(inlineMarkdown).join('').replace(/^(\[[ xX]\])(?=\S)/, '$1 ').trim();
+      var marker = tag === 'ol' ? (n++ + '. ') : '- ';
+      lines.push(pad + marker + ownText);
+      nestedLists.forEach(function(nested){
+        var nestedMd = listMarkdown(nested, indent + 2);
+        if (nestedMd) lines.push(nestedMd);
+      });
+    });
+    return lines.join('\n');
   }
 
   function blockMarkdown(node, listIndex){
@@ -1941,13 +2181,7 @@
     if (tag === 'blockquote') return inlineMarkdown(node).trim().split('\n').map(function(line){ return '> ' + line; }).join('\n');
     if (tag === 'pre') return '```\n' + (node.innerText || '').replace(/\n$/,'') + '\n```';
     if (tag === 'hr') return '---';
-    if (tag === 'ul'){
-      return Array.prototype.map.call(node.children, function(li){ return '- ' + inlineMarkdown(li).trim(); }).join('\n');
-    }
-    if (tag === 'ol'){
-      var n = 1;
-      return Array.prototype.map.call(node.children, function(li){ return (n++) + '. ' + inlineMarkdown(li).trim(); }).join('\n');
-    }
+    if (tag === 'ul' || tag === 'ol') return listMarkdown(node, 0);
     if (tag === 'li') return (listIndex || '-') + ' ' + inlineMarkdown(node).trim();
     if (tag === 'table'){
       var rows = Array.prototype.map.call(node.querySelectorAll('tr'), function(row){
@@ -2187,6 +2421,7 @@
     updatePageNav();
     preview.focus();
     scheduleAutosave();
+    if (previewModeOn) preview.innerHTML = renderMarkdown(editor.value); // keep the read-only view in sync with the new page
   }
 
   function goToPrevPage(){
@@ -2215,6 +2450,14 @@
     }
     if (mod && e.key === 'ArrowRight' && editModeBackdrop.hidden){
       if (currentPage < pages.length - 1){ e.preventDefault(); goToNextPage(); }
+    }
+    if (mod && e.key.toLowerCase() === 'p' && editModeBackdrop.hidden){
+      e.preventDefault(); // overrides the browser's native Print dialog by design
+      togglePreviewMode();
+    }
+    if (e.key === 'Escape' && previewModeOn){
+      e.preventDefault();
+      exitPreviewMode();
     }
   });
 
@@ -2394,6 +2637,47 @@
       setTimeout(function(){ t.hidden = true; }, 200);
     }, 1800);
   }
+
+  /* ---------- Final Preview (read-only) mode ---------- */
+  var appRoot = document.querySelector('.app');
+  var btnPreviewMode = document.getElementById('btnPreviewMode');
+  var paneLabelHint = document.getElementById('paneLabelHint');
+  var previewModeOn = false;
+  var LIVE_HINT_TEXT = paneLabelHint ? paneLabelHint.innerHTML : '';
+  var PREVIEW_HINT_TEXT = 'Read-only — showing the final rendered layout for this page';
+
+  function enterPreviewMode(){
+    if (previewModeOn) return;
+    previewModeOn = true;
+    closeMenu(); // never leave the slash menu open behind a read-only view
+    saveCurrentPageContent();
+    preview.setAttribute('contenteditable', 'false');
+    preview.innerHTML = renderMarkdown(editor.value); // no live-caret marker — this is a frozen snapshot
+    appRoot.classList.add('previewing');
+    if (btnPreviewMode){ btnPreviewMode.classList.add('active'); btnPreviewMode.textContent = 'Exit Preview'; }
+    if (paneLabelHint) paneLabelHint.textContent = PREVIEW_HINT_TEXT;
+    btnUndo.disabled = true;
+    btnRedo.disabled = true;
+  }
+
+  function exitPreviewMode(){
+    if (!previewModeOn) return;
+    previewModeOn = false;
+    preview.setAttribute('contenteditable', 'true');
+    appRoot.classList.remove('previewing');
+    if (btnPreviewMode){ btnPreviewMode.classList.remove('active'); btnPreviewMode.textContent = 'Preview'; }
+    if (paneLabelHint) paneLabelHint.innerHTML = LIVE_HINT_TEXT;
+    updatePreview(); // restore the editable, caret-aware render
+    updateHistoryButtons(); // restore Undo/Redo to their real availability
+    preview.focus();
+  }
+
+  function togglePreviewMode(){
+    if (previewModeOn) exitPreviewMode();
+    else enterPreviewMode();
+  }
+
+  if (btnPreviewMode) btnPreviewMode.addEventListener('click', togglePreviewMode);
 
   /* ---------- editing mode (batch line edits) ---------- */
   var editModeBackdrop = document.getElementById('editModeBackdrop');
@@ -2689,6 +2973,7 @@
 
   var demoTextCleared = false;
   preview.addEventListener('click', function(){
+    if (previewModeOn) return;
     if (demoTextCleared) return;
     demoTextCleared = true;
     preview.innerHTML = '<p><br></p>';
@@ -2697,6 +2982,7 @@
   });
 
   preview.addEventListener('blur', function(){
+    if (previewModeOn) return;
     if (!demoTextCleared) return;
     if (preview.textContent.replace(/\u200b/g, '').trim() !== '') return;
     if (currentPage === 0){
@@ -2794,6 +3080,7 @@
   }
 
   preview.addEventListener('input', function(){
+    if (previewModeOn) return;
     var convertedToList = tryAutoNumberedList();
     if (!convertedToList) tryAutoCapitalize();
     updateMarkdownFromBoard();
@@ -2810,13 +3097,32 @@
   });
 
   preview.addEventListener('keydown', function(ev){
+    if (previewModeOn) return; // read-only: editing shortcuts are inert (Escape/Ctrl+P to exit are handled at the document level)
     var mod = ev.ctrlKey || ev.metaKey;
 
     if (menuOpen){
+      if (tablePickerOpen){
+        if (ev.key === 'Escape'){ ev.preventDefault(); tablePickerOpen = false; renderMenu(); return; }
+        if (ev.key === 'ArrowRight'){ ev.preventDefault(); updateGridHighlight(tablePickerRows, tablePickerCols+1); return; }
+        if (ev.key === 'ArrowLeft'){ ev.preventDefault(); updateGridHighlight(tablePickerRows, tablePickerCols-1); return; }
+        if (ev.key === 'ArrowDown'){ ev.preventDefault(); updateGridHighlight(tablePickerRows+1, tablePickerCols); return; }
+        if (ev.key === 'ArrowUp'){ ev.preventDefault(); updateGridHighlight(tablePickerRows-1, tablePickerCols); return; }
+        if (ev.key === 'Enter'){ ev.preventDefault(); insertTable(tablePickerRows, tablePickerCols); return; }
+        ev.preventDefault();
+        return;
+      }
       if (ev.key === 'Escape'){ ev.preventDefault(); closeMenu(); return; }
       if (ev.key === 'ArrowDown'){ ev.preventDefault(); activeIndex = Math.min(activeIndex+1, flatItems.length-1); highlightActive(); return; }
       if (ev.key === 'ArrowUp'){ ev.preventDefault(); activeIndex = Math.max(activeIndex-1, 0); highlightActive(); return; }
-      if (ev.key === 'Enter'){ ev.preventDefault(); if (flatItems[activeIndex]) commitItem(flatItems[activeIndex].item); else closeMenu(); return; }
+      if (ev.key === 'Enter'){
+        ev.preventDefault();
+        if (flatItems[activeIndex]){
+          var chosen = flatItems[activeIndex].item;
+          if (chosen.type === 'table-picker') renderTablePicker();
+          else commitItem(chosen);
+        } else closeMenu();
+        return;
+      }
       if (ev.key === 'Backspace'){
         ev.preventDefault();
         if (filterString.length > 0){ filterString = filterString.slice(0,-1); renderMenu(); positionMenu(); }
@@ -2831,6 +3137,25 @@
         return;
       }
       ev.preventDefault();
+      return;
+    }
+
+    if (ev.key === 'Tab' && !mod){
+      var inList = closestBlock();
+      if (inList && inList.nodeName === 'LI'){
+        ev.preventDefault();
+        restoreBoardSelection();
+        document.execCommand(ev.shiftKey ? 'outdent' : 'indent', false, null);
+        updateMarkdownFromBoard();
+        saveBoardSelection();
+        return;
+      }
+      // Outside a list, let Tab insert a literal tab character rather than
+      // jumping focus away from the editor (the default contenteditable
+      // behavior for Tab is unhelpful here since this is the only field).
+      ev.preventDefault();
+      document.execCommand('insertText', false, '\t');
+      updateMarkdownFromBoard();
       return;
     }
 
