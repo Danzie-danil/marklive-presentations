@@ -3028,61 +3028,40 @@
     // intentional body text than a list the user wants renumbered.
     if (match[1] !== '1') return false;
 
-    // Strip the typed "1. " trigger text, then promote the block to <ol>.
-    node.textContent = node.textContent.slice(0, range.startOffset - match[0].length) +
-                        node.textContent.slice(range.startOffset);
+    // Strip the typed "1. " trigger text. If that empties the text node
+    // entirely, drop in a zero-width space first — calling execCommand
+    // on a genuinely empty text node is unreliable across browsers (the
+    // block can end up collapsing instead of becoming a list).
+    var remainder = node.textContent.slice(range.startOffset);
+    var newOffset = range.startOffset - match[0].length;
+    var newText = node.textContent.slice(0, newOffset) + remainder;
+    if (newText === ''){
+      newText = '\u200b';
+      newOffset = 0;
+    }
+    node.textContent = newText;
     var caretRange = document.createRange();
-    caretRange.setStart(node, range.startOffset - match[0].length);
+    caretRange.setStart(node, newOffset);
     caretRange.collapse(true);
     sel.removeAllRanges();
     sel.addRange(caretRange);
     savedSelection = caretRange.cloneRange();
 
     document.execCommand('insertOrderedList', false, null);
-    return true;
-  }
 
-  /* Capitalizes the first letter of a block the moment it's typed —
-     covers the start of a brand-new paragraph/list item/heading, not
-     letters typed later mid-sentence. Skips inside code blocks, where
-     case is often meaningful (e.g. variable names). */
-  function tryAutoCapitalize(){
-    var sel = window.getSelection();
-    if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
-    var range = sel.getRangeAt(0);
-    var node = range.startContainer;
-    if (node.nodeType !== 3) return;
-    if (range.startOffset !== 1) return; // only the very first character typed
-
-    var block = closestBlock();
-    if (!block || block.nodeName === 'PRE') return;
-
-    // Confirm no other text precedes this character within the block
-    // (covers list items, headings, quotes, and plain paragraphs alike).
-    var walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, null);
-    var n;
-    while ((n = walker.nextNode())){
-      if (n === node) break;
-      if (n.textContent.length) return;
+    // Clean up the zero-width placeholder now that the list exists —
+    // its only job was keeping the node non-empty for execCommand.
+    if (node.textContent === '\u200b' && node.isConnected){
+      node.textContent = '';
+      var li = closestBlock();
+      placeCaretInside(li && li.nodeName === 'LI' ? li : node.parentNode);
     }
-
-    var ch = node.textContent.charAt(0);
-    var upper = ch.toUpperCase();
-    if (ch === upper) return; // not a lowercase letter (number, symbol, already capital)
-
-    node.textContent = upper + node.textContent.slice(1);
-    var caretRange = document.createRange();
-    caretRange.setStart(node, range.startOffset);
-    caretRange.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(caretRange);
-    savedSelection = caretRange.cloneRange();
+    return true;
   }
 
   preview.addEventListener('input', function(){
     if (previewModeOn) return;
-    var convertedToList = tryAutoNumberedList();
-    if (!convertedToList) tryAutoCapitalize();
+    tryAutoNumberedList();
     updateMarkdownFromBoard();
     saveBoardSelection();
     schedulePush();
